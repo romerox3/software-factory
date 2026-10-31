@@ -108,7 +108,7 @@ flowchart LR
 | Proceso | Ve | No ve nunca | Credenciales |
 |---|---|---|---|
 | Ejecutor (sandbox) | Snapshot de la base, spec visible, tests visibles (solo lectura) | Tests ocultos, holdouts, historial futuro, otros runs, token de GitHub | Una virtual key efímera con `max_budget` y modelos del equipo de su `data_class` |
-| Orquestador (torre) | La parte visible de las tareas, los artefactos de sus runs | Holdouts, tests ocultos | Una clave de *team admin* que solo emite virtual keys en los equipos de generación. Una key creada con `team_id` hereda las restricciones de modelos del equipo [Cierto, [model access](https://docs.litellm.ai/docs/proxy/model_access)]. Queda por verificar que el rol de *team admin* esté en OSS [Probable]. Si es una función enterprise, un servicio mínimo de emisión en Hetzner custodia la master key y solo expone `mint(data_class, budget)` |
+| Orquestador (torre) | La parte visible de las tareas, los artefactos de sus runs | Holdouts, tests ocultos | **Solo un token del servicio de emisión de keys**. Una key creada con `team_id` hereda las restricciones de modelos del equipo [Cierto, [model access](https://docs.litellm.ai/docs/proxy/model_access)], pero el rol de *team admin* de LiteLLM es de pago (`team_endpoints.py`, tag v1.86.2) [Cierto, `notas:conocimiento/infra/litellm-gateway-que-se-puede-hacer.md`]. Por eso un **servicio mínimo de emisión en Hetzner** custodia la master key y solo expone `mint(data_class, budget_usd, ttl)` y `spend/revoke(key)`, con los equipos de generación fijados en su configuración. El orquestador no puede emitir keys del equipo verificador |
 | Minero (Hetzner) | El historial completo del repo, los parches gold y de tests | — | Lectura del repo piloto; escritura en el almacén de tareas |
 | Verificador (Hetzner) | Diff, tarea completa, holdouts, mirror | El contenedor y el entorno del agente | Deploy key de holdouts; virtual key del **equipo verificador** (juez) |
 | Publicador | Veredictos y diffs aceptados | Holdouts, trayectorias | Token de GitHub App con alcance de PR en borrador, sin permiso de merge |
@@ -129,6 +129,7 @@ flowchart LR
 | Snapshot fresh-init | Amenaza T15 → M2 y M5 válidos | El agente podría leer el fix del historial |
 | Red solo al gateway | T16 + presupuesto aplicado + ADR-0009 | Fuga de datos, coste sin medir, fix descargado de la red |
 | Gateway con virtual keys | M1 (coste real y sombra), presupuesto por run, ADR-0009 | Sin coste fiable ni política de datos aplicada |
+| Servicio de emisión de keys (~100 líneas, en Hetzner) | Restricción: la master key no puede estar en la zona del generador, y el *team admin* de LiteLLM es de pago | El orquestador tendría la master key y podría crear keys de cualquier equipo (incluido el verificador) |
 | Precios sombra > 0 | M1 de los modelos gratuitos. Además, **LiteLLM se salta los checks de presupuesto si el coste del modelo es 0** [Cierto en la bandera de código `user_api_key_auth.py`; Probable en que afecte al budget de la key], así que precio 0 = sin fusible | Brazos gratuitos con M1 = 0 y sin corte de presupuesto |
 | Verificador en otra máquina | Tesis 2 + T17/T18 → M5 creíble | Holdouts legibles por convención, no por construcción |
 | Mutation (informativo en F0) | M7 y calidad de los tests; T04/T05 | Tests tautológicos sin detectar |
