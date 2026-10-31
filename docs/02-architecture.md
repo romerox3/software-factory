@@ -1,0 +1,160 @@
+# 02 · Arquitectura
+
+> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, el único punto por el que pasan los modelos y el dinero). Un orquestador determinista mueve artefactos entre ellas. Los LLM solo viven dentro de los nodos de ejecución y de las señales blandas. En F0 el orquestador es el runner del harness (Harbor) más scripts; en F1 es un runner DOT mínimo para el flujo issue→PR en borrador. Cada componente aparece en la tabla de §7 con la métrica que mueve o la restricción que cumple. Si no tiene ninguna, no se construye.
+
+## 1. Capas
+
+| # | Capa | Pieza | Reutilizar o construir |
+|---|---|---|---|
+| L1 | Intake de tareas | Carpetas OpenSpec ([ADR-0005](adr/0005-task-format.md)); en F0 las genera el minero, en F1 un issue etiquetado | Formato reutilizado; minero propio ([06](06-harness-and-tasks.md)) |
+| L2 | Orquestación | F0: Harbor + scripts. F1: runner DOT mínimo ([ADR-0002](adr/0002-orchestrator.md)) | Reutilizar en F0; construir fino en F1 |
+| L3 | Contrato de ejecutor | Esquemas + adaptadores ([04](04-executor-contract.md)) | Construir (fino sobre los agentes de Harbor) |
+| L4 | Sandbox | Docker con red restringida y snapshot sin historial ([ADR-0003](adr/0003-sandbox.md)) | Reutilizar Docker; construir el snapshot y la red |
+| L5 | Gateway | LiteLLM con virtual keys, equipos por clase de datos y precios sombra ([ADR-0004](adr/0004-gateway.md)) | Reutilizar |
+| L6 | Serving local | vLLM en la 5090 | Reutilizar |
+| L7 | Verificación | Verificador aislado ([05](05-verification-design.md)) | **Construir** |
+| L8 | Publicación (F1+) | Publicador de safe outputs: aplica el diff verificado y abre el PR en borrador | Construir (poco código) sobre la API de GitHub |
+| L9 | Telemetría y datos | JSONL crudo + normalizador + OTel Collector; métricas por script ([01](01-metrics.md), [ADR-0006](adr/0006-trajectory-store.md)) | Reutilizar el Collector; construir el normalizador y las métricas |
+
+## 2. Despliegue: dónde corre cada pieza
+
+```mermaid
+flowchart TB
+  subgraph TORRE["Torre (RTX 5090) — zona GENERADOR"]
+    ORQ["Orquestador F0/F1<br/>(Harbor + scripts / runner DOT)"]
+    SB1["Sandbox Docker<br/>ejecutor + snapshot fresh-init"]
+    SB2["Sandbox Docker …"]
+    VLLM["vLLM<br/>(modelos locales)"]
+    ART["Almacén de artefactos de salida<br/>(diff, runs, trayectorias)"]
+    ORQ --> SB1 & SB2
+    SB1 & SB2 --> ART
+  end
+  subgraph GW["Gateway (LiteLLM) — zona DINERO"]
+    LL["LiteLLM<br/>virtual key por ejecución<br/>equipos por clase de datos"]
+  end
+  subgraph HZ["Hetzner — zona VERIFICADOR"]
+    VER["Verificador<br/>(checkout limpio + capas duras)"]
+    MIR["Mirror de repos (solo lectura)"]
+    HOLD["Holdouts y tests ocultos<br/>(repo privado, deploy key local)"]
+    VERD["Veredictos"]
+    OTEL["OTel Collector + informes"]
+    VER --> MIR & HOLD
+    VER --> VERD
+  end
+  subgraph EXT["Proveedores"]
+    ANT["Anthropic API"]
+    ZAI["z.ai (GLM)"]
+  end
+  SB1 & SB2 -- "solo HTTP al gateway" --> LL
+  LL --> VLLM
+  LL --> ANT & ZAI
+  VER -- "pull de artefactos (solo lectura)" --> ART
+  VER -- "juez (equipo verificador)" --> LL
+  SB1 -. "OTLP" .-> OTEL
+  PUB["Publicador (F1+)<br/>token de escritura GitHub"] -- "lee veredicto accept" --> VERD
+  PUB -- "PR en borrador" --> GH[(GitHub)]
+```
+
+- **Dónde vive el gateway**: se reutiliza la instancia LiteLLM existente del propietario, con equipos y claves dedicados a la factory. Su host está en `factory-pilot-data`, no en este repo. Si la configuración de equipos o de precios choca con otros usos, se separa en una instancia propia ([ADR-0004](adr/0004-gateway.md), cómo revertir).
+- **La torre no puede llegar a los holdouts**: no tiene la deploy key ni una ruta de red al almacén del verificador. Hetzner tira de la torre y no al revés.
+- **El publicador** corre en Hetzner (o donde viva el token de GitHub) y no en la torre. Es el único proceso con permiso de escritura en GitHub, y solo actúa sobre veredictos `accept` cuyo `diff_sha` coincide.
+
+## 3. Flujo F0 (baseline)
+
+```mermaid
+sequenceDiagram
+  participant M as Minero (Hetzner)
+  participant TS as Almacén de tareas (privado)
+  participant O as Orquestador (torre)
+  participant G as Gateway
+  participant S as Sandbox
+  participant V as Verificador (Hetzner)
+  M->>TS: tarea OpenSpec + tests ocultos + imagen base
+  O->>TS: lee SOLO la parte visible (spec, visible_tests, Dockerfile)
+  O->>G: crea virtual key (equipo = data_class, max_budget)
+  O->>S: snapshot fresh-init + ejecutor + prompt base
+  S->>G: llamadas al modelo
+  S-->>O: fin (exit, abort.json)
+  O->>O: git diff, copia la trayectoria cruda, normaliza
+  O->>G: lee el gasto de la key y la revoca
+  V->>O: pull de diff.patch + run.json
+  V->>V: capas duras sobre un checkout limpio
+  V-->>V: verdict.json
+```
+
+**El almacén de tareas se divide en dos**. La parte visible (spec, tests visibles y Dockerfile) se replica a la torre. La parte oculta (parche de tests, F2P/P2P y holdouts) solo existe en Hetzner. El minero corre en Hetzner porque necesita ver los parches de tests.
+
+## 4. Flujo F1 (issue → PR en borrador)
+
+```mermaid
+flowchart LR
+  I[Issue con etiqueta<br/>factory:C1] --> SP[Spec OpenSpec<br/>escrito o validado por un humano]
+  SP --> H[Holdouts escritos fuera del generador]
+  SP --> R[Nodo ejecutor<br/>contrato 04]
+  R --> V[Verificador]
+  V -->|reject y reintentos < N| R
+  V -->|reject y reintentos = N| NH[Etiqueta needs-human]
+  V -->|accept| P[Publicador: PR en borrador]
+  P --> HR[Revisión humana + merge humano]
+  HR --> MT[Métricas M3/M4/M7]
+```
+
+- El grafo es un fichero DOT versionado (`pipelines/issue-to-draft-pr.dot`), con un subconjunto de nodos y atributos compatible con Attractor ([ADR-0002](adr/0002-orchestrator.md)).
+- Los reintentos son deterministas, por defecto 2, y reciben como contexto el motivo del veredicto, nunca los holdouts.
+- `needs-human` tras N fallos sigue la regla de [dark-factory-experiment](https://github.com/coleam00/dark-factory-experiment) (referencia de diseño; el repo no tiene licencia) [Cierto en la ausencia de licencia, verificada el 2026-10-31].
+
+## 5. Fronteras de confianza y credenciales
+
+| Proceso | Ve | No ve nunca | Credenciales |
+|---|---|---|---|
+| Ejecutor (sandbox) | Snapshot de la base, spec visible, tests visibles (solo lectura) | Tests ocultos, holdouts, historial futuro, otros runs, token de GitHub | Una virtual key efímera con `max_budget` y modelos del equipo de su `data_class` |
+| Orquestador (torre) | La parte visible de las tareas, los artefactos de sus runs | Holdouts, tests ocultos | Una clave de *team admin* que solo emite virtual keys en los equipos de generación. Una key creada con `team_id` hereda las restricciones de modelos del equipo [Cierto, [model access](https://docs.litellm.ai/docs/proxy/model_access)]. Queda por verificar que el rol de *team admin* esté en OSS [Probable]. Si es una función enterprise, un servicio mínimo de emisión en Hetzner custodia la master key y solo expone `mint(data_class, budget)` |
+| Minero (Hetzner) | El historial completo del repo, los parches gold y de tests | — | Lectura del repo piloto; escritura en el almacén de tareas |
+| Verificador (Hetzner) | Diff, tarea completa, holdouts, mirror | El contenedor y el entorno del agente | Deploy key de holdouts; virtual key del **equipo verificador** (juez) |
+| Publicador | Veredictos y diffs aceptados | Holdouts, trayectorias | Token de GitHub App con alcance de PR en borrador, sin permiso de merge |
+| Humano | Todo | — | — |
+
+## 6. Red
+
+- Los sandboxes se conectan a una red Docker dedicada (`factory-egress`). En el host, unas reglas de `iptables`/`nftables` en la cadena `DOCKER-USER` solo dejan pasar tráfico hacia `IP:puerto` del gateway. No hay DNS público y los nombres internos se resuelven con `--add-host`.
+- Se aplica en el host y no en Harbor porque Harbor tiene abiertas las issues de red privada sin Internet y de allowlist ([#3611](https://github.com/harbor-framework/harbor/issues/3611), [#3992](https://github.com/harbor-framework/harbor/issues/3992), [#3821](https://github.com/harbor-framework/harbor/issues/3821)) [Cierto, abiertas el 2026-10-31]. Si Harbor no puede usar una red Docker concreta, el spike 1 lo detectará y el plan B es ejecutar el agente con la subclase propia, que crea el contenedor ella misma.
+- El verificador ejecuta los tests con `--network none`, salvo en las tareas que declaren gemelos de servicios (WireMock o Testcontainers) en su propia red interna.
+
+## 7. Justificación de cada componente (minimalismo verificable)
+
+| Componente | Métrica que mueve o restricción que cumple | Si no estuviera… |
+|---|---|---|
+| Harbor (runner) | Permite medir M1, M2 y M5 a escala con concurrencia | Habría que escribir un runner paralelo: tesis 1 |
+| Contrato + adaptadores | Tesis 4 (agnóstico). Hace comparable M1 y M2 entre agentes | Las métricas dependerían del formato de cada CLI |
+| Snapshot fresh-init | Amenaza T15 → M2 y M5 válidos | El agente podría leer el fix del historial |
+| Red solo al gateway | T16 + presupuesto aplicado + ADR-0009 | Fuga de datos, coste sin medir, fix descargado de la red |
+| Gateway con virtual keys | M1 (coste real y sombra), presupuesto por run, ADR-0009 | Sin coste fiable ni política de datos aplicada |
+| Precios sombra > 0 | M1 de los modelos gratuitos. Además, **LiteLLM se salta los checks de presupuesto si el coste del modelo es 0** [Cierto en la bandera de código `user_api_key_auth.py`; Probable en que afecte al budget de la key], así que precio 0 = sin fusible | Brazos gratuitos con M1 = 0 y sin corte de presupuesto |
+| Verificador en otra máquina | Tesis 2 + T17/T18 → M5 creíble | Holdouts legibles por convención, no por construcción |
+| Mutation (informativo en F0) | M7 y calidad de los tests; T04/T05 | Tests tautológicos sin detectar |
+| SAST con reglas propias | T03, T06, T07, T22 | Trampas de código sin detectar |
+| Juez de otro vendor (F2) | M3 (desempate en best-of-n) | Best-of-n elegiría al azar entre verdes |
+| Critic 4B (F2, condicional) | Solo entra si se correlaciona con M2 en F2 | No se construye |
+| Cross-check (F2, condicional) | Solo entra si mejora M3 o M4 | No se construye |
+| Runner DOT (F1) | Pipeline issue→PR reproducible y versionado; tesis 3 y 8 | El flujo estaría en código imperativo sin formato portable |
+| Publicador | Safe outputs: el ejecutor no tiene escritura (gh-aw, Eve) | El agente tendría el token de GitHub |
+| NATS JetStream | **No está en F0 ni en F1.** Entra en F2 solo si el fan-out de best-of-n o la cola de issues lo necesitan (métrica: M6 limitado por la cola) | — |
+| Langfuse, Opik o Docent (UI de trazas) | **No está en F0.** Docent como piloto en F1 si el análisis por lotes de trayectorias detecta clusters de trampa que M5 no ve | — |
+| Equipo de roles | **No está.** Solo entraría si el harness mide que mejora M1 o M3 frente a un solo agente | — |
+
+## 8. Matriz de datos × proveedor
+
+Detalle en el [ADR-0009](adr/0009-data-policy-per-repo.md). Se aplica en el gateway: cada `data_class` es un equipo de LiteLLM con su lista de modelos permitidos, y la lista de modelos por key o por equipo está en la versión OSS [Cierto, [model access](https://docs.litellm.ai/docs/proxy/model_access)].
+
+| `data_class` | Local (5090) | z.ai GLM | API de Anthropic | API de OpenAI | Otros proveedores gratuitos o de cuota |
+|---|---|---|---|---|---|
+| `public` (repo fixture, la factory) | sí | sí | sí | sí | sí |
+| `internal` | sí | sí | sí | sí | según los términos de retención |
+| `client-product` (piloto) | sí | sí | sí | **no, salvo autorización** | **no** |
+| `client-restricted` | sí | no | sí | no | no |
+
+## Decisiones abiertas
+
+- Si el gateway compartido admite equipos dedicados sin interferir con otros usos, o si conviene una instancia propia desde el principio.
+- Tipo del servidor Hetzner (dedicado o Cloud). No afecta a F0 ni a F1, pero sí al [ADR-0003](adr/0003-sandbox.md) en F2.
+- Dónde vive el almacén de artefactos de la torre (disco local o MinIO). Por minimalismo, disco local + `rsync` pull desde Hetzner en F0.
