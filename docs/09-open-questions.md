@@ -1,12 +1,12 @@
 # 09 · Supuestos y preguntas abiertas
 
-> **Resumen.** Recoge los supuestos con los que se escribió el plan, las preguntas que debe responder el propietario y los hallazgos de la revisión independiente que no se incorporaron, cada uno con su argumento. Las tres decisiones que bloquean más trabajo están en §1. Ningún supuesto bloquea el arranque de F0-01, F0-02, F0-06, F0-08, F0-09 ni F0-11.
+> **Resumen.** Recoge los supuestos con los que se escribió el plan, las preguntas que debe responder el propietario y los hallazgos de la revisión independiente que no se incorporaron, cada uno con su argumento. Las tres decisiones que más trabajo bloquean están en §1. **F0 no usa código del cliente**: S3, S4 y D1 solo bloquean F1. Ningún supuesto bloquea el arranque de F0-01, F0-02, F0-05, F0-06, F0-08, F0-09 ni F0-11.
 
 ## 1. Decisiones que necesita tomar el propietario
 
 | # | Decisión | Opciones | Qué bloquea | Recomendación |
 |---|---|---|---|---|
-| D1 | **¿Pueden ver código del piloto OpenAI, NaN u OpenRouter?** | Ninguno (por defecto) · solo OpenAI con retención cero · otros | El brazo «Codex con modelo de OpenAI». Si no hay autorización, Codex corre con GLM ([ADR-0009](adr/0009-data-policy-per-repo.md)) | Ninguno en F0. Codex × GLM es suficiente para comparar ejecutores |
+| D1 | **¿Pueden ver código del piloto OpenAI, NaN u OpenRouter?** | Ninguno (por defecto) · solo OpenAI con retención cero · otros | El brazo «Codex con modelo de OpenAI» **desde F1**. En F0 no bloquea nada: las tareas son públicas ([ADR-0009](adr/0009-data-policy-per-repo.md)) | Ninguno en F1. Codex × GLM basta para comparar ejecutores; A2′ con OpenAI se puede medir en F0 sin autorización |
 | D2 | **Licencia de orca-role-hook** | Pedir a Felipe Castaño Apache-2.0 o MIT · no pedir nada | Solo un eventual port de `verify_task.py` o `crosscheck.sh`. El diseño no lo necesita ([ADR-0007](adr/0007-orca-role-hook.md)) | Pedirla de todos modos para poder citar o portar sin dudas. Preguntarle además si los commits firmados con su correo de Vicomtech (3, todos en `bin/agent.sh`) tienen alguna reclamación de su empleador. Ningún otro activo candidato tiene commits de ese correo |
 | D3 | **¿Aceptas que F3 dependa del volumen (≥ 150 cambios por clase) y no del calendario?** | Sí · bajar el umbral (por ejemplo, 60 cambios → cota ~5 %) | El criterio de [ADR-0008](adr/0008-gates-and-auto-merge.md) | Sí. Bajar el volumen sube la cota de regresiones aceptada, y eso es una decisión de riesgo, no técnica |
 
@@ -15,9 +15,9 @@
 | # | Supuesto | Origen | Cómo se cierra |
 |---|---|---|---|
 | S1 | El repo es Apache-2.0, privado durante la construcción y público al validarse, sin rastro del piloto | Respuesta del propietario (2026-10-31) | — |
-| S2 | Las tareas salen de los tres repos de producto del piloto; se levanta la regla «sin repos de clientes» para ellos | Respuesta del propietario (2026-10-31) | — |
-| S3 | **Uso del código del cliente como dataset de evaluación**: la política verificada del propietario cubre qué proveedores de modelos pueden ver ese código, **no su uso como benchmark**, ni guardar tareas, holdouts y trayectorias derivadas | Hueco detectado | El propietario confirma que el contrato con el cliente lo permite |
-| S4 | **El evaluador en Hetzner puede alojar código del cliente** (mirror, tests ocultos) | Hueco detectado | El propietario confirma que el servidor está dentro del perímetro permitido |
+| S2 | **F0 usa solo tareas públicas recientes** (SWE-rebench y SWE-bench-Live, [06](06-harness-and-tasks.md) §2.1). Los tres repos de producto del piloto entran en F1, con la regla «sin repos de clientes» levantada para ellos | Respuesta del propietario (2026-10-31) | — |
+| S3 | **Uso del código del cliente como dataset de evaluación (F1+)**: la política verificada del propietario cubre qué proveedores de modelos pueden ver ese código, **no su uso como benchmark**, ni guardar tareas, holdouts y trayectorias derivadas | Hueco detectado | El propietario confirma que el contrato con el cliente lo permite |
+| S4 | **El evaluador en Hetzner puede alojar código del cliente (F1+)** (mirror, tests ocultos) | Hueco detectado | El propietario confirma que el servidor está dentro del perímetro permitido |
 | S5 | Sin tope mensual. Presupuesto por ejecución + coste sombra + alarma a los 300 USD de gasto real en Anthropic | Respuesta del propietario | — |
 | S6 | El baseline Claude Code usa **Sonnet** (versión vigente, fijada) | Juicio propio: el prompt fija el agente, no el modelo | El propietario lo confirma o pide Opus |
 | S7 | Documentación en español; código e identificadores en inglés | Respuesta del propietario | — |
@@ -26,7 +26,9 @@
 | S10 | La instancia compartida del gateway admite equipos dedicados sin interferir con otros usos | Juicio propio | F0-03 |
 | S11 | La torre tiene un kernel con nftables `fib inet`, así que el control de egress de Harbor funcionará allí | [Probable]: falla en macOS | F0-07 |
 | S12 | El modelo local es de clase Qwen3.6-35B-A3B y cabe cuantizado con 64k de contexto en 32 GB | [Suposición] | F0-03 |
-| S13 | El minado del piloto rinde ~20 % de los PRs que tocan tests, como SWE-bench | [Probable] por analogía | F0-05 |
+| S13 | El minado del piloto rinde ~20 % de los PRs que tocan tests, como SWE-bench. Ya no afecta a F0: solo importa si en F1+ se mina el piloto | [Probable] por analogía | Una medición de elegibilidad en F1, si S3 lo permite |
+| S16 | El split `2026_03` de SWE-rebench-leaderboard es todo Python y hay ≥ 30 tareas posteriores al corte de los modelos de los brazos. Algunos modelos no publican su corte | [Probable] | F0-05 y F0-17 |
+| S17 | Las licencias de los datasets (CC-BY-4.0 y MIT) permiten usarlos para evaluar y publicar el manifiesto con atribución. Los repos de origen tienen sus propias licencias, pero no se redistribuye su código | [Probable] | Revisión de las *dataset cards* en F0-05 |
 | S14 | **La cuenta de z.ai que usa el gateway es de API de pago por token**, no un plan de suscripción («coding plan»). El 429 con > 6 concurrentes apunta a un plan con límites [Suposición]. Si es un plan, A2, A3, A6 y los peones chocan con la regla 2 de `CLAUDE.md` («nunca planes de consumo en ejecuciones automáticas») | Revisión independiente | El propietario confirma el tipo de cuenta y, si es un plan, que sus términos permiten uso automatizado; si no, cambiar a la API de pago (R21) |
 | S15 | `/spend/logs` por key está en LiteLLM OSS y da los tokens por petición | [Probable] | F0-03 |
 
@@ -71,5 +73,5 @@ Lo que no se incorporó, o solo en parte:
 ## Decisiones abiertas
 
 - D1, D2 y D3 de §1.
-- S3 y S4 deben confirmarse antes de F0-17 (minar las tareas reales).
+- S3 y S4 deben confirmarse **antes de F1** (cuando entra código del piloto). Ya no bloquean F0.
 - S14 debe confirmarse antes de F0-18 (la matriz usa z.ai en tres brazos).

@@ -14,6 +14,7 @@ Software factory con agentes de IA: un pipeline determinista que convierte tarea
 | `examples/executor/` | Un ejemplo de entrada y salida por adaptador; deben validar contra `schemas/` |
 | `spikes/NN-*/` | Experimentos acotados (≤ 2 h) para cerrar un ADR, con un README de resultados |
 | `fixtures/` (F0) | Repos de juguete y diffs de trampa por amenaza: los únicos datos de tareas que viven aquí |
+| `tasks/*.manifest.json` (F0) | Manifiestos de los conjuntos públicos (dataset de HF, revisión, `instance_id`, digest de imagen). La tarea se regenera a partir de ellos; los tests ocultos nunca están en este repo |
 | `factory/` (F0) | Código Python 3.12 (`uv`): `gateway/`, `snapshot/`, `miner/`, `tasks/`, `adapters/`, `verifier/`, `normalize/`, `metrics/` |
 | `prompts/` (F0) | Prompts versionados de los ejecutores (`base-v1.md`); cambiar uno dispara M8 |
 | `pipelines/` (F1) | Pipelines DOT (subconjunto Attractor, [ADR-0002](docs/adr/0002-orchestrator.md)) |
@@ -35,7 +36,7 @@ Software factory con agentes de IA: un pipeline determinista que convierte tarea
 
 ## Quién implementa
 
-- **Peones** (OpenCode con modelos del gateway, en worktrees aislados): las tareas del backlog marcadas «Peón». Reciben la spec de la tarea tal cual y fixtures públicos, nunca datos del almacén privado.
+- **Peones** (OpenCode con modelos del gateway, en worktrees aislados): las tareas del backlog marcadas «Peón». Reciben la spec de la tarea tal cual, fixtures y, como mucho, la parte visible de las tareas públicas. Nunca datos del almacén privado ni la parte oculta de ninguna tarea.
 - **Sonnet** (subagente): verificador antitrampas, contrato de ejecutor, aislamiento y rescates. Como mucho 3 al día, avisando antes.
 - **Orquestador** (Claude Code en este repo): configuración, ejecuciones con datos privados, revisión e integración. No escribe la lógica que revisa.
 - Un subagente nunca espera más de 270 s entre dos llamadas. Lo que dura más se lanza en segundo plano y se le reanuda cuando hay resultado.

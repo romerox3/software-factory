@@ -119,9 +119,9 @@ Capas: **DG** diff-guard · **CL** checkout limpio y build desde la base · **HT
 
 ## 6. Holdouts: quién los escribe, dónde viven y cómo se impide leerlos
 
-- **En las tareas minadas (F0)**: el holdout es el **parche de tests del PR original**, escrito por humanos antes de que existiera la factory. Se separa en el minado ([06](06-harness-and-tasks.md)) y va directo al almacén del verificador.
+- **En las tareas importadas (F0) o minadas (F1+)**: el holdout es el **parche de tests del PR original**, escrito por humanos antes de que existiera la factory. Va directo al almacén del verificador. En las públicas está oculto para el generador (que no tiene red), pero no para el preentrenamiento del modelo: el corte temporal de [06](06-harness-and-tasks.md) §3 es lo que lo protege.
 - **En las tareas nuevas (F1+)**: los escenarios los escribe **una persona** (quien abre la tarea) o **un modelo de otra familia en un proceso que no tiene acceso al generador**. Una persona revisa los segundos antes de activarlos. El generador no participa nunca.
-- **Almacenamiento**: un repo git privado (`holdouts`) dentro del almacén privado del piloto. Su deploy key de lectura está **solo** en la máquina del verificador. La máquina del generador no tiene ni la clave, ni la ruta de red, ni el montaje.
+- **Almacenamiento**: un repo git privado (`holdouts`) en el almacén del verificador, con las tareas públicas de F0 y, desde F1, las del piloto. Su deploy key de lectura está **solo** en la máquina del verificador. La máquina del generador no tiene ni la clave, ni la ruta de red, ni el montaje.
 - **Por construcción, no por convención**:
   1. Otra máquina (Hetzner) con otro usuario del sistema.
   2. Otras credenciales: la virtual key del verificador tiene un alias de equipo distinto en el gateway, y el generador no puede emitirla.

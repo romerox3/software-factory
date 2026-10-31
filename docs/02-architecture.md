@@ -113,7 +113,7 @@ flowchart LR
 |---|---|---|---|
 | Ejecutor (sandbox) | Snapshot de la base, spec visible, tests visibles (solo lectura) | Tests ocultos, holdouts, historial futuro, otros runs, token de GitHub | Una virtual key efímera con `max_budget` y modelos del equipo de su `data_class` |
 | Orquestador (torre) | La parte visible de las tareas, los artefactos de sus runs | Holdouts, tests ocultos | **Solo un token del servicio de emisión de keys**. Una key creada con `team_id` hereda las restricciones de modelos del equipo [Cierto, [model access](https://docs.litellm.ai/docs/proxy/model_access)], pero el rol de *team admin* de LiteLLM es de pago (`team_endpoints.py`, tag v1.86.2) [Cierto, `notas:conocimiento/infra/litellm-gateway-que-se-puede-hacer.md`]. Por eso un **servicio mínimo de emisión en Hetzner** custodia la master key y solo expone `mint(data_class, budget_usd, ttl)` y `spend/revoke(key)`, con los equipos de generación fijados en su configuración. El orquestador no puede emitir keys del equipo verificador |
-| Minero (Hetzner) | El historial completo del repo, los parches gold y de tests | — | Lectura del repo piloto; escritura en el almacén de tareas |
+| Importador y minero (Hetzner) | Los datasets públicos fijados (F0); desde F1, el historial completo del repo piloto | — | Lectura de los datasets o del repo; escritura en el almacén de tareas |
 | Verificador (Hetzner) | Diff, tarea completa, holdouts, mirror | El contenedor y el entorno del agente | Deploy key de holdouts; virtual key del **equipo verificador** (juez) |
 | Publicador | Veredictos y diffs aceptados | Holdouts, trayectorias | Token de GitHub App con alcance de PR en borrador, sin permiso de merge |
 | Humano | Todo | — | — |

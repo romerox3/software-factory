@@ -1,6 +1,6 @@
 # 06 · Harness y tareas
 
-> **Resumen.** El harness ejecuta *tareas × brazos × repeticiones* sobre Harbor y entrega cada diff al verificador aislado. Las tareas C1/C2 se minan de PRs fusionados del piloto con la receta de SWE-bench (F2P/P2P con el gold 3 veces, tests ocultos), más un snapshot sin historial y un detector de fugas en el spec. Sale ~1 tarea válida por cada 5 PRs con tests [Probable]. Hay seis brazos, comparados con k = 3, para separar el efecto del agente del efecto del modelo. orca-roles queda fuera porque no corre desatendido.
+> **Resumen.** El harness ejecuta *tareas × brazos × repeticiones* sobre Harbor y entrega cada diff al verificador aislado. **Las tareas de F0 son públicas y recientes**: se importan de los splits de 2026 de SWE-rebench y SWE-bench-Live (Python y TS) y se revalidan en nuestro entorno (gold 3/3, base en rojo 3/3, sin flaky, snapshot sin historial). El código del piloto entra en F1, como issues reales. La receta de minado de PRs queda para F1+. Hay seis brazos, comparados con k = 3, y orca-roles queda fuera porque no corre desatendido.
 
 ## 1. Runner
 
@@ -8,7 +8,38 @@
 - **Uso de Harbor**: solo se le encarga la **fase de generación** y la extracción del diff. Su verificador «separado» (`environment_mode = "separate"`) corre en el mismo host Docker [Cierto en la documentación de tareas de Harbor]. Eso no cumple la tesis 2, así que el verificador de Harbor solo ejecuta los tests visibles como señal temprana (no decisiva) y exporta el diff como artefacto. **El veredicto lo da el verificador de Hetzner** ([05](05-verification-design.md)).
 - **Formato de tarea de Harbor**: `instruction.md`, `task.toml` (schema 1.4), `environment/` (Dockerfile), `solution/solve.sh` y `tests/test.sh`. La recompensa va en `/logs/verifier/reward.txt` o `reward.json` [Cierto]. La parte de la tarea que se replica a la torre **no lleva `solution/` ni los tests ocultos**: `solution/` queda vacío y `tests/` solo tiene los tests visibles. Un conversor genera la tarea de Harbor a partir de la tarea OpenSpec.
 
-## 2. Receta de minado de PRs fusionados
+## 2. Fuentes de tareas
+
+| Fase | Fuente | Por qué |
+|---|---|---|
+| **F0** | **Tareas públicas recientes** (§2.1) | F0 mide el harness y compara brazos, y para eso da igual de quién sea el código, siempre que la tarea sea posterior al corte de los modelos y del stack que interesa. Sin datos del cliente, F0 no depende de S3, S4 ni D1 ([09](09-open-questions.md)); los peones trabajan con tareas reales; y el conjunto congelado de M8 se puede publicar |
+| **F1+** | **Issues reales del piloto** (pipeline issue → PR en borrador) y, si S3 lo permite, PRs minados del piloto para el conjunto rotativo (§2.2) | M3, M4 y M6 solo existen donde una persona revisa y fusiona. La autonomía (F3) se gana en el repo donde se fusiona el código |
+
+F0 no dice nada concreto sobre el código del piloto: lo dice F1. **Ninguna decisión de autonomía se toma con datos de F0.**
+
+### 2.1 F0: importar y revalidar tareas públicas
+
+- **Fuentes**, fijadas por la revisión (commit) del dataset en Hugging Face. Datos de la API de HF del 2026-10-31 [Cierto]:
+  - [`nebius/SWE-rebench-leaderboard`](https://huggingface.co/datasets/nebius/SWE-rebench-leaderboard) (CC-BY-4.0). Un split por mes: el último, `2026_03`, tiene 110 tareas creadas entre el 2026-03-01 y el 2026-05-12. Trae F2P/P2P, la imagen Docker de cada tarea y columnas `harbor_*`. Aporta **~20 tareas Python** [Probable que todo el split sea Python; se comprueba en F0-05].
+  - [`SWE-bench-Live/MultiLang`](https://huggingface.co/datasets/SWE-bench-Live/MultiLang), split `ts` (MIT): 111 tareas creadas hasta el 2026-04-20. Aporta **~10 tareas TS**.
+  - Respaldo, si no hay bastantes tareas posteriores al corte: los splits mensuales siguientes que se publiquen y el split `js` de MultiLang (108).
+- **Selección**:
+  - solo tareas creadas después del **corte único** de §3;
+  - clasificadas como C1 o C2 según el tamaño del gold (§4);
+  - se descartan las de repos excluidos por clase (auth, facturación, infraestructura);
+  - el muestreo es aleatorio con semilla fijada dentro de lo elegible.
+- **Revalidación en nuestro entorno**: se aplican los pasos 4–8, 10 y 11 de la receta de §2.2. La imagen sale del dataset, fijada por digest, en lugar de construirse.
+  - Gold 3/3 y base en rojo 3/3.
+  - F2P y P2P **se vuelven a derivar** en nuestro entorno; los del dataset no se aceptan tal cual.
+  - Se descartan los flaky.
+  - El snapshot se hace `fresh-init` a partir del directorio del repo de la imagen.
+  - Las tareas con fuga en el enunciado **se descartan**, no se reescriben.
+- **Spec**: `proposal.md` es el enunciado del issue tal cual, más el campo `interface` donde lo haya. No hay reescritura humana. Se audita una muestra de 10 tareas.
+- **Lo oculto no va al repo**: el parche de tests, el gold y las listas F2P/P2P viven en el almacén del verificador. El repo solo guarda un manifiesto (`tasks/public-v1.manifest.json`) con el dataset, su revisión, los `instance_id` y los digests de las imágenes. Así el conjunto se reproduce sin redistribuir nada y se cumple la atribución de CC-BY-4.0.
+- **Contaminación**: el gold y los tests de estas tareas están publicados en internet. Para el generador están ocultos porque no tiene red, pero un modelo los pudo ver al entrenar si la tarea es anterior a su corte. De ahí que el corte de §3 sea obligatorio, y que el conjunto se renueve con los splits nuevos.
+- **Calibración (informativa)**: SWE-rebench publica el porcentaje resuelto por modelo en cada ventana, con su propio scaffold [Probable]. Si A1 se queda > 15 puntos por debajo de la cifra publicada del mismo modelo en las mismas tareas, se revisa el harness antes de leer resultados. No es un criterio de salida, porque el scaffold es distinto.
+
+### 2.2 Receta de minado de PRs fusionados (F1+, piloto, solo si S3 lo permite)
 
 Se basa en el pipeline de colección de SWE-bench ([SWE-bench/SWE-bench](https://github.com/SWE-bench/SWE-bench), MIT; `swebench/collect/utils.py` y `grading.py`) [Cierto] y en SWE-rebench V2 ([arXiv 2602.23866](https://arxiv.org/abs/2602.23866); código en [SWE-rebench/SWE-rebench-V2](https://github.com/SWE-rebench/SWE-rebench-V2), MIT) [Cierto]. Cambia en los cuatro puntos marcados con ★.
 
@@ -32,11 +63,11 @@ Se basa en el pipeline de colección de SWE-bench ([SWE-bench/SWE-bench](https:/
 - SWE-bench: 93 139 PRs → 11 407 tras el filtro de atributos (resuelven un issue y aportan tests) → 2 294 tras la ejecución, un **~20 % de los PRs con tests** ([arXiv 2310.06770](https://arxiv.org/abs/2310.06770), Tabla 10) [Probable, cifras leídas por un subagente].
 - SWE-rebench V2: de 583 809 candidatos, 41 349 con F2P (~7 %) [Probable].
 - En un repo privado con PRs pequeños y tests ligados a cada PR, el rendimiento estará más cerca del de SWE-bench que del de SWE-rebench [Suposición].
-- **La tarea F0-05 lo mide antes de comprometer las 30.**
+- **Si en F1+ se mina el piloto, una medición de elegibilidad por repo va antes de comprometer tareas.**
 
 ### Fuera del minado: síntesis
 
-Si el piloto no da 30 tareas válidas, se completa con **inyección de bugs al estilo SWE-smith** ([arXiv 2504.21798](https://arxiv.org/abs/2504.21798); [SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith), MIT): se reescribe una función con un bug y se usan como F2P los tests existentes que pasan a fallar. El rendimiento de validación de SWE-smith fue del 50,1 % [Probable].
+Si no hay 30 tareas válidas, ni públicas posteriores al corte ni minadas, se completa con **inyección de bugs al estilo SWE-smith** ([arXiv 2504.21798](https://arxiv.org/abs/2504.21798); [SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith), MIT): se reescribe una función con un bug y se usan como F2P los tests existentes que pasan a fallar. El rendimiento de validación de SWE-smith fue del 50,1 % [Probable].
 
 Las tareas sintéticas se etiquetan `synthetic`, se reportan aparte y no cuentan para el criterio de salida de F0. Sesgo conocido: sobrerrepresentan bugs pequeños y locales.
 
@@ -44,12 +75,12 @@ Las tareas sintéticas se etiquetan `synthetic`, se reportan aparte y no cuentan
 
 | Vector | Riesgo en este proyecto | Control |
 |---|---|---|
-| El modelo vio el repo en su preentrenamiento | Bajo: los repos piloto son privados [Probable] | Se registra si algún repo tuvo un espejo público. Si lo tuvo, se aplica **un único corte para todos los brazos**: solo entran PRs fusionados después de la fecha más tardía de entre las fechas de corte de conocimiento declaradas por los modelos de los brazos. Si un modelo no declara su corte, se usa su **fecha de publicación**. La fecha resultante se anota en el informe |
+| El modelo vio el repo, el gold o los tests en su preentrenamiento | **Alto en F0** (tareas públicas); bajo en las del piloto (repos privados) [Probable] | **Obligatorio en F0**, y en el piloto solo si algún repo tuvo un espejo público: **un único corte para todos los brazos**: solo entran PRs fusionados después de la fecha más tardía de entre las fechas de corte de conocimiento declaradas por los modelos de los brazos. Si un modelo no declara su corte, se usa su **fecha de publicación**. La fecha resultante se anota en el informe |
 | El agente lee la solución en el historial | Alto sin control (T15) | Snapshot fresh-init (paso 8) + prueba `leak-git-history` |
 | El agente la descarga de la red (T16) | Alto sin control | Red solo hacia el gateway |
 | El spec delata la solución | Medio: 23 % en SWE-rebench V2 [Probable] | Pasos 9 y 10 |
 | Los prompts se ajustan a las tareas del conjunto congelado (Goodhart) | Medio con M8 | Conjunto rotativo + canarias que rotan ([05](05-verification-design.md) §7) |
-| Las tareas del piloto acaban en el repo público | Alto si se mezclan | [ADR-0009](adr/0009-data-policy-per-repo.md) + hook de pre-commit |
+| Las tareas del piloto (F1+) acaban en el repo público | Alto si se mezclan | [ADR-0009](adr/0009-data-policy-per-repo.md) + hook de pre-commit |
 
 ## 4. Clases de tarea
 
@@ -83,7 +114,8 @@ Una clase necesita **≥ 8 tareas** en el conjunto de F0 para reportarse por sep
 - **Las comparaciones entre brazos usan las 3 primeras repeticiones de cada brazo** (pass@1, pass^3 y M1 con el mismo k). Las repeticiones 4 y 5 de los brazos sin coste real solo sirven para estimar pass^5 y la varianza dentro de cada brazo; nunca se comparan con A1.
 - **Concurrencia**: A2, A3 y A6 comparten ≤ 4 en paralelo **entre los tres**, porque z.ai devuelve 429 con más de ~6 concurrentes [Cierto, medido en otro proyecto del propietario]. A4 y A5 dependen de vLLM en una sola GPU [Suposición: ~4 secuencias concurrentes con contexto de 64k].
 - **Tiempo de pared estimado**: 2–3 días de ejecución desatendida [Suposición].
-- Si la autorización de OpenAI para el código del piloto llega ([ADR-0009](adr/0009-data-policy-per-repo.md)), se añade **A2′ · Codex × un modelo de OpenAI** con k = 3.
+- **Los brazos se limitan a los proveedores permitidos para el piloto** (5090, z.ai, Anthropic), aunque las tareas de F0 sean públicas, para que lo aprendido en F0 se aplique tal cual en F1.
+- **A2′ · Codex × un modelo de OpenAI** (k = 3) es opcional en F0: con tareas públicas no necesita la autorización D1. Aporta Codex con su modelo nativo y cuesta otros 90–270 USD [Suposición]. En F1 solo sigue si D1 lo autoriza.
 - Los brazos con modelo local o de cuota usan **coste sombra**: el precio de lista de un modelo equivalente publicado por el proveedor (GLM, el precio de su API de pago; Qwen local, el precio por token de un proveedor que lo sirva), configurado en el gateway y declarado en el informe.
 
 ### Por qué no está el «equipo orca-roles»
@@ -104,12 +136,13 @@ Además, su coste medido fue de **~37,6 USD por tarea** (4 tareas reales, 44 ses
 
 ## 6. Ciclo de vida del conjunto de tareas
 
-- **Congelado**: las 30 tareas de F0 forman el conjunto congelado v1 (M8), que se congela al terminar F0-18. No se modifican; una tarea con un defecto descubierto se retira y se registra. En F2 crece hasta ≥ 80 tareas para bajar el margen de no-inferioridad de M8 a 10 puntos ([01](01-metrics.md) §3).
-- **Rotativo**: el minado mensual de PRs nuevos alimenta el conjunto rotativo y las canarias.
+- **Congelado**: las 30 tareas públicas de F0 forman el conjunto congelado v1 (M8), que se congela al terminar F0-18. **Es publicable**: el manifiesto vive en el repo y cualquiera puede reproducir la CI de la factory. No se modifican; una tarea con un defecto descubierto se retira y se registra. En F2 crece hasta ≥ 80 tareas para bajar el margen de no-inferioridad de M8 a 10 puntos ([01](01-metrics.md) §3).
+- **Rotativo**: cada split mensual nuevo de los datasets públicos alimenta el conjunto rotativo y las canarias. Desde F1, y solo si S3 lo permite, también los PRs minados del piloto.
+- **Caducidad del congelado**: cuando un brazo nuevo use un modelo con un corte posterior a las tareas del congelado, ese congelado deja de servir para ese brazo y se crea uno nuevo (v2) con splits posteriores.
 - **Auditoría**: cada trimestre una persona revisa 10 tareas al azar (spec, F2P y gold), siguiendo la lección de la auditoría de OpenAI sobre SWE-bench Verified ([post](https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/)).
 
 ## Decisiones abiertas
 
 - Qué modelo local exacto y con qué cuantización. Depende de la memoria que deje libre el contexto de 64k en 32 GB [Suposición]. Se fija en F0-03.
-- Si el conjunto de F0 debe incluir tareas de los tres repos o solo de los dos con más rendimiento. Lo decide la medición de F0-05.
+- La proporción Python/TS (20/10 por defecto, aproximando el stack del piloto) y si subir n de 30 a 50. Subirlo solo cuesta más ejecuciones de A1 (~60–180 USD más) y baja el efecto mínimo detectable a ~13 puntos ([01](01-metrics.md) §3).
 - La tarifa sombra exacta por modelo: hay que documentarla con fuente y fecha en la configuración del gateway.

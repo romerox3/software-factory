@@ -1,14 +1,14 @@
 # 08 · Riesgos
 
-> **Resumen.** Hay 21 riesgos, cada uno con probabilidad, impacto, señal temprana y mitigación, calificados A/M/B por juicio propio [Suposición] salvo donde se cita un dato. Los tres más serios:
+> **Resumen.** Hay 22 riesgos, cada uno con probabilidad, impacto, señal temprana y mitigación, calificados A/M/B por juicio propio [Suposición] salvo donde se cita un dato. Los tres más serios:
 > 1. Que el verificador no detecte una trampa nueva o filtre el oráculo, y M5 dé una falsa sensación de seguridad (R1, R18, R19).
-> 2. Que el piloto no rinda 30 tareas válidas o no tenga volumen para F3 (R2, R3).
+> 2. Que no haya bastantes tareas públicas posteriores al corte de los modelos, o que el piloto no tenga volumen para F3 (R2, R3).
 > 3. Que se filtre código del cliente, ya sea al repo público o a un proveedor no autorizado (R4, R5).
 
 | # | Riesgo | Prob. | Impacto | Señal temprana | Mitigación |
 |---|---|---|---|---|---|
 | R1 | **Trampa no modelada**: un agente encuentra una ruta que ninguna capa dura cubre, y M5 y M2 quedan inflados | M | A | Una auditoría humana encuentra un `accept` incorrecto. Clusters raros en las trayectorias. Un salto de pass@1 al subir de versión de modelo | Auditoría trimestral de veredictos. Canarias que rotan. Revisión de trayectorias de canarias (Docent como piloto en F1). Toda trampa nueva se añade a la tabla de [05](05-verification-design.md) con su fixture |
-| R2 | **El piloto rinde menos de 30 tareas válidas** | M | A | F0-05 da < 150 PRs candidatos con tests | Criterio de abandono de F0 (cambiar de fuente). Completar con SWE-smith marcado `synthetic` (no cuenta para salir) |
+| R2 | **Menos de 30 tareas públicas posteriores al corte** de los modelos de los brazos: los splits recientes son pequeños (~50–110 tareas al mes [Cierto, HF]) y el corte de algunos modelos es desconocido | M | M | F0-05 cuenta < 60 tareas elegibles tras el filtro de corte y clase | Zona intermedia de F0 (esperar a los splits nuevos, añadir `js`). Abandono: minar el piloto (§2.2 de [06](06-harness-and-tasks.md)). SWE-smith marcado `synthetic` (no cuenta para salir) |
 | R3 | **Volumen insuficiente para F3**: < 150 cambios de una clase en 6 meses | A | A (no se llega a L4; la factory queda como generadora de borradores) | Ritmo de issues `factory:C1` en F1 | Criterio de abandono de F3. Asumirlo: la factory vale como generadora de borradores aunque no llegue a L4 |
 | R4 | **Código del cliente en el repo público** | M | A | El hook de pre-commit bloquea algo. Aparece un nombre del cliente en una revisión | Separación física ([ADR-0009](adr/0009-data-policy-per-repo.md)) + hook que falla de forma cerrada + escaneo de todo el historial antes de publicar. El hook bloqueó una mención el 2026-10-31 [Cierto] |
 | R5 | **Código del cliente a un proveedor no autorizado** | B | A | Un alias nuevo en el gateway sin clasificar | La lista de modelos permitidos por equipo se aplica en el gateway. Las keys son efímeras. La configuración del gateway se revisa en cada cambio |
@@ -28,6 +28,7 @@
 | R19 | **El código candidato ataca al verificador**: lee los tests ocultos, falsifica el JUnit o escribe fuera de su workspace (T29) | M | A | Un JUnit sin todos los ids de F2P esperados. Lecturas de rutas de tests desde código de producción | Contenedor efímero sin red ni almacén, veredicto escrito fuera del contenedor y comprobación de ids. Riesgo residual: un escape del contenedor (fuera de alcance, [05](05-verification-design.md)) |
 | R20 | **Dependencia de plataforma: GitHub y Hetzner**. M3, M6, el intake de F1 y el publicador usan GitHub; el verificador vive en Hetzner | B | M | Cambios de API o de precio de GitHub Apps; caída o cambio de condiciones de Hetzner | Eventos de PR exportados a `prs/*.jsonl` e interfaz de forge mínima (abrir PR, leer eventos). Verificador sin estado salvo el almacén git de holdouts, que se puede mover a cualquier máquina Linux ([03](03-reuse-inventory.md)) |
 | R21 | **Términos de z.ai**: tres brazos (A2, A3 y A6) y los peones usan GLM a través de z.ai. Si la cuenta es un plan de suscripción, puede chocar con la regla «sin planes de consumo en ejecuciones automáticas» o limitar el uso automatizado | M | M | Respuesta del propietario a S14; 429 o avisos de uso | Confirmar S14. Si hace falta, cambiar a la API de pago por token de z.ai (sube el coste real) o servir GLM en local si cabe. A4 y A5 (local) ya son un segundo proveedor |
+| R22 | **Los resultados de F0 no se trasladan al piloto**: las tareas públicas son sobre todo bugfixes de librerías con buenos tests; el piloto es código de producto (API, BFF, SPA) | A | M | En F1, el pass@1 sobre issues del piloto cae muy por debajo del de F0 en el mismo brazo | Ninguna decisión de autonomía se toma con F0. F1 mide sobre el piloto y vuelve a ordenar los brazos si hace falta. La elección de brazo para F1 se trata como hipótesis |
 
 ## Decisiones abiertas
 

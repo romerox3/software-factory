@@ -29,7 +29,7 @@ Requisito previo: confirmar que la torre o un Hetzner dedicado exponen `/dev/kvm
 
 ## Consecuencias
 
-- Hasta F2, el aislamiento depende del kernel compartido. Es aceptable porque el código ejecutado es de repos propios o del piloto, y los agentes son de proveedores conocidos.
+- Hasta F2, el aislamiento depende del kernel compartido. Es aceptable porque el código ejecutado es de repos públicos seleccionados (F0) o del piloto (F1+), y los agentes son de proveedores conocidos.
 - La regla de red en el host es obligatoria aunque Harbor aplique la suya (defensa en profundidad).
 
 ## Cómo revertir

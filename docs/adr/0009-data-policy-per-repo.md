@@ -4,8 +4,8 @@
 
 ## Contexto
 
-- Las tareas de F0 se minan de los repos de producto de un **cliente** (el piloto).
-- El propietario ha levantado la regla «sin repos de clientes en F0–F2» para ese código de producto.
+- **F0 usa solo tareas públicas** ([06](../06-harness-and-tasks.md) §2.1, decisión del propietario del 2026-10-31). El código de los repos de producto de un **cliente** (el piloto) entra en **F1**, como issues reales tratados por el pipeline, y como PRs minados solo si S3 lo permite.
+- El propietario ha levantado la regla «sin repos de clientes en F0–F2» para ese código de producto. Con el cambio, en F0 la regla se cumple de todos modos; la excepción solo se usa desde F1.
 - Su política de datos vigente permite, para ese código, **modelos locales, GLM de z.ai y la API de Anthropic**, y excluye dos repos del cliente con material sensible (infraestructura compartida y un repo puente con hosts de bases de datos) [Cierto, política del propietario, fuera de este repo].
 - Este repositorio se publicará como Apache-2.0 sin rastro del piloto.
 
@@ -35,7 +35,8 @@ Se elige la 2.
 
 ## Consecuencias
 
-- El brazo «Codex con modelo de OpenAI» no existe en F0 para tareas del piloto. Codex corre con GLM.
+- En F0 todas las tareas son `public`, así que D1 no bloquea nada. El brazo opcional A2′ (Codex × OpenAI) se puede ejecutar sin autorización, pero los brazos base usan solo los proveedores permitidos para el piloto, para que los resultados se trasladen a F1. Desde F1, el brazo «Codex con modelo de OpenAI» no existe para tareas del piloto salvo que D1 lo autorice.
+- Hasta F1 no hace falta mirror del piloto en Hetzner ni confirmar S3 y S4.
 - El juez de otro vendor que ve código del piloto es un modelo local o de Anthropic, nunca un proveedor gratuito.
 - Los informes publicables usan identificadores de tarea opacos.
 
