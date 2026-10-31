@@ -1,6 +1,6 @@
 # 02 · Arquitectura
 
-> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, el único punto por el que pasan los modelos y el dinero). Un orquestador determinista mueve artefactos entre ellas. Los LLM solo viven dentro de los nodos de ejecución y de las señales blandas. En F0 el orquestador es el runner del harness (Harbor) más scripts; en F1 es un runner DOT mínimo para el flujo issue→PR en borrador. Cada componente aparece en la tabla de §7 con la métrica que mueve o la restricción que cumple. Si no tiene ninguna, no se construye.
+> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, por donde pasan los modelos y el dinero). Un orquestador determinista mueve artefactos entre ellas, siempre con pull desde Hetzner. Los LLM solo viven en los nodos de ejecución y en las señales blandas. En F0 orquestan Harbor y unos scripts; en F1, un runner DOT mínimo. Cada componente justifica en §7 la métrica que mueve o la restricción que cumple.
 
 ## 1. Capas
 
@@ -26,8 +26,10 @@ flowchart TB
     SB2["Sandbox Docker …"]
     VLLM["vLLM<br/>(modelos locales)"]
     ART["Almacén de artefactos de salida<br/>(diff, runs, trayectorias)"]
+    OTEL["OTel Collector<br/>(telemetría de Claude Code)"]
     ORQ --> SB1 & SB2
     SB1 & SB2 --> ART
+    OTEL --> ART
   end
   subgraph GW["Gateway (LiteLLM) — zona DINERO"]
     LL["LiteLLM<br/>virtual key por ejecución<br/>equipos por clase de datos"]
@@ -37,7 +39,7 @@ flowchart TB
     MIR["Mirror de repos (solo lectura)"]
     HOLD["Holdouts y tests ocultos<br/>(repo privado, deploy key local)"]
     VERD["Veredictos"]
-    OTEL["OTel Collector + informes"]
+    REP["Métricas e informes"]
     VER --> MIR & HOLD
     VER --> VERD
   end
@@ -50,13 +52,15 @@ flowchart TB
   LL --> ANT & ZAI
   VER -- "pull de artefactos (solo lectura)" --> ART
   VER -- "juez (equipo verificador)" --> LL
-  SB1 -. "OTLP" .-> OTEL
+  SB1 -. "OTLP (red local de la torre)" .-> OTEL
+  REP -- "pull" --> ART
   PUB["Publicador (F1+)<br/>token de escritura GitHub"] -- "lee veredicto accept" --> VERD
   PUB -- "PR en borrador" --> GH[(GitHub)]
 ```
 
 - **Dónde vive el gateway**: se reutiliza la instancia LiteLLM existente del propietario, con equipos y claves dedicados a la factory. Su host está en `factory-pilot-data`, no en este repo. Si la configuración de equipos o de precios choca con otros usos, se separa en una instancia propia ([ADR-0004](adr/0004-gateway.md), cómo revertir).
-- **La torre no puede llegar a los holdouts**: no tiene la deploy key ni una ruta de red al almacén del verificador. Hetzner tira de la torre y no al revés.
+- **La torre no puede llegar a los holdouts**: no tiene la deploy key ni una ruta de red al almacén del verificador. **Todo movimiento de datos entre zonas es un pull desde Hetzner** (artefactos, trayectorias, telemetría). La torre nunca empuja nada a Hetzner.
+- **El OTel Collector vive en la torre**, en la red interna de los sandboxes junto al gateway. Recibe la telemetría de Claude Code y la escribe como JSONL en el almacén de artefactos, de donde Hetzner la recoge. Los sandboxes no tienen ninguna ruta hacia Hetzner.
 - **El publicador** corre en Hetzner (o donde viva el token de GitHub) y no en la torre. Es el único proceso con permiso de escritura en GitHub, y solo actúa sobre veredictos `accept` cuyo `diff_sha` coincide.
 
 ## 3. Flujo F0 (baseline)
@@ -100,7 +104,7 @@ flowchart LR
 ```
 
 - El grafo es un fichero DOT versionado (`pipelines/issue-to-draft-pr.dot`), con un subconjunto de nodos y atributos compatible con Attractor ([ADR-0002](adr/0002-orchestrator.md)).
-- Los reintentos son deterministas, por defecto 2, y reciben como contexto el motivo del veredicto, nunca los holdouts.
+- Los reintentos son deterministas, por defecto 2, y solo reciben la **categoría** del rechazo, según la lista blanca de [05](05-verification-design.md) principio 7. Nunca valores, nombres ni trazas de tests ocultos o holdouts (amenaza T28).
 - `needs-human` tras N fallos sigue la regla de [dark-factory-experiment](https://github.com/coleam00/dark-factory-experiment) (referencia de diseño; el repo no tiene licencia) [Cierto en la ausencia de licencia, verificada el 2026-10-31].
 
 ## 5. Fronteras de confianza y credenciales
@@ -116,7 +120,7 @@ flowchart LR
 
 ## 6. Red
 
-- Los sandboxes se conectan a una red Docker dedicada (`factory-egress`). En el host, unas reglas de `iptables`/`nftables` en la cadena `DOCKER-USER` solo dejan pasar tráfico hacia `IP:puerto` del gateway. No hay DNS público y los nombres internos se resuelven con `--add-host`.
+- Los sandboxes se conectan a una red Docker dedicada (`factory-egress`). En el host, unas reglas de `iptables`/`nftables` en la cadena `DOCKER-USER` solo dejan pasar tráfico hacia `IP:puerto` del gateway y del OTel Collector local. No hay DNS público y los nombres internos se resuelven con `--add-host`.
 - Se aplica en el host y no en Harbor porque Harbor tiene abiertas las issues de red privada sin Internet y de allowlist ([#3611](https://github.com/harbor-framework/harbor/issues/3611), [#3992](https://github.com/harbor-framework/harbor/issues/3992), [#3821](https://github.com/harbor-framework/harbor/issues/3821)) [Cierto, abiertas el 2026-10-31]. Si Harbor no puede usar una red Docker concreta, el spike 1 lo detectará y el plan B es ejecutar el agente con la subclase propia, que crea el contenedor ella misma.
 - El verificador ejecuta los tests con `--network none`, salvo en las tareas que declaren gemelos de servicios (WireMock o Testcontainers) en su propia red interna.
 
@@ -132,12 +136,20 @@ flowchart LR
 | Servicio de emisión de keys (~100 líneas, en Hetzner) | Restricción: la master key no puede estar en la zona del generador, y el *team admin* de LiteLLM es de pago | El orquestador tendría la master key y podría crear keys de cualquier equipo (incluido el verificador) |
 | Precios sombra > 0 | M1 de los modelos gratuitos. Además, **LiteLLM se salta los checks de presupuesto si el coste del modelo es 0** [Cierto en la bandera de código `user_api_key_auth.py`; Probable en que afecte al budget de la key], así que precio 0 = sin fusible | Brazos gratuitos con M1 = 0 y sin corte de presupuesto |
 | Verificador en otra máquina | Tesis 2 + T17/T18 → M5 creíble | Holdouts legibles por convención, no por construcción |
-| Mutation (informativo en F0) | M7 y calidad de los tests; T04/T05 | Tests tautológicos sin detectar |
+| Contenedor efímero de verificación | T29 (el código candidato ataca al verificador) | El código bajo prueba compartiría el disco con los holdouts y la deploy key |
+| Mirror del verificador | Tesis 2: checkout limpio que no controla el generador | El verificador clonaría lo que el generador pudiera modificar |
+| Minero de tareas | Tesis 1 (se construye) → M2 y M5 válidos sobre tareas propias | Habría que usar benchmarks públicos contaminados |
+| Normalizador de trayectorias | Tesis 1 (se construye). M1 por ejecutor (diagnóstico de dónde va el coste) y revisión de canarias (M5) | Un análisis distinto por formato de CLI |
+| vLLM | Brazos A4/A5 (M1 con modelo local) | Sin brazo local |
+| OTel Collector (en la torre) | M1: conciliación del coste de Claude Code (`claude_code.cost.usage`) con el gateway | Sin conciliación. Si se demuestra innecesaria en F0, se quita |
+| lizard, jscpd, PyDriller | M7a, M7b, M7d/e y M4 | Sin métrica de mantenibilidad ni de regresiones |
+| Forge (GitHub) | Intake (issues) y salida (PR en borrador) en F1. M3 y M6 | Ver [03](03-reuse-inventory.md): interfaz mínima de forge y eventos exportados a JSONL |
+| Mutation (informativo en F0) | T04/T05 y la evidencia de C4 (mutantes del verificador) | Tests tautológicos y código no ejercitado sin detectar |
 | SAST con reglas propias | T03, T06, T07, T22 | Trampas de código sin detectar |
 | Juez de otro vendor (F2) | M3 (desempate en best-of-n) | Best-of-n elegiría al azar entre verdes |
 | Critic 4B (F2, condicional) | Solo entra si se correlaciona con M2 en F2 | No se construye |
 | Cross-check (F2, condicional) | Solo entra si mejora M3 o M4 | No se construye |
-| Runner DOT (F1) | Pipeline issue→PR reproducible y versionado; tesis 3 y 8 | El flujo estaría en código imperativo sin formato portable |
+| Runner DOT (F1) | Tesis 3 (determinista) y reproducibilidad del pipeline (grafo versionado + checkpoints). La portabilidad entre motores ya no es un argumento ([ADR-0002](adr/0002-orchestrator.md) §4) | El flujo estaría en código imperativo sin un grafo revisable |
 | Publicador | Safe outputs: el ejecutor no tiene escritura (gh-aw, Eve) | El agente tendría el token de GitHub |
 | NATS JetStream | **No está en F0 ni en F1.** Entra en F2 solo si el fan-out de best-of-n o la cola de issues lo necesitan (métrica: M6 limitado por la cola) | — |
 | Langfuse, Opik o Docent (UI de trazas) | **No está en F0.** Docent como piloto en F1 si el análisis por lotes de trayectorias detecta clusters de trampa que M5 no ve | — |

@@ -6,6 +6,12 @@
 
 El gateway es el único punto que **aplica** presupuesto y política de datos, y la única fuente común de coste para todos los agentes. El propietario ya opera una instancia de LiteLLM con varios proveedores.
 
+## Opciones
+
+1. **LiteLLM**: la instancia que ya opera el propietario.
+2. **Bifrost**: Apache-2.0, en Go.
+3. **Sin gateway**: cada CLI habla directamente con su proveedor. Se descarta porque no habría ni presupuesto ni política de datos aplicados en un solo punto, ni una fuente común de coste.
+
 ## Datos (verificados el 2026-10-31; detalle en [03](../03-reuse-inventory.md))
 
 | Necesidad | LiteLLM OSS | Bifrost OSS |
@@ -22,7 +28,16 @@ El gateway es el único punto que **aplica** presupuesto y política de datos, y
 
 ## Decisión
 
-**LiteLLM**: la instancia existente del propietario con equipos dedicados (uno por `data_class` más uno para el verificador), **versión fijada por digest de imagen**, nunca `pip install` sin hash. Bifrost queda como plan B.
+**LiteLLM**: la instancia existente del propietario con equipos dedicados (uno por `data_class` más uno para el verificador), **versión fijada por digest de imagen**, nunca `pip install` sin hash.
+
+**Plan B: una segunda instancia de LiteLLM propia de la factory**, con imagen fijada por otro digest. Bifrost **no** es plan B mientras no se verifique en un spike su puente Responses y una forma de leer el gasto por key.
+
+**El coste no depende del gateway**:
+- el harness guarda, por ejecución, los tokens por petición que registra el gateway (`/spend/logs` filtrado por key [Probable en OSS; se comprueba en F0-03]);
+- calcula el coste con una **tabla de precios versionada** (real y sombra, con fuente y fecha por modelo);
+- el `spend` de `/key/info` queda como comprobación cruzada.
+
+Así, cambiar de gateway solo obliga a reescribir el lector de tokens.
 
 ## Consecuencias
 
@@ -32,4 +47,9 @@ El gateway es el único punto que **aplica** presupuesto y política de datos, y
 
 ## Cómo revertir
 
-El contrato solo ve `gateway_alias` y una base URL. Cambiar a Bifrost supone reescribir la configuración de modelos, equipos y precios y el lector de gasto por key (que en Bifrost puede no existir en OSS: habría que leer sus logs). Si la instancia compartida da problemas, el primer paso es una instancia LiteLLM propia de la factory.
+El contrato solo ve `gateway_alias` y una base URL. Si la instancia compartida da problemas, se pasa al plan B, una instancia LiteLLM propia. Cambiar de producto, por ejemplo a Bifrost, supone reescribir:
+- la configuración de modelos, equipos y precios;
+- el servicio de emisión de keys;
+- el lector de tokens por petición.
+
+Antes hay que verificar en un spike el puente Responses y el registro por petición de ese producto.

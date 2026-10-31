@@ -1,11 +1,11 @@
 # 04 · Contrato de ejecutor
 
-> **Resumen.** Todo agente se ejecuta a través de un único contrato: una entrada JSON (repo, commit, tarea OpenSpec, presupuesto, ejecutor y alias de modelo) y una salida JSON (exit, diff, trayectorias, tokens, coste y procedencia), ambas con JSON Schema 2020-12 en [`schemas/`](../schemas). El adaptador de cada CLI solo traduce la invocación y la salida cruda. **El diff, el coste y la trayectoria normalizada los produce el harness**, no el agente. Los cuatro adaptadores de partida (Claude Code, Codex CLI, OpenCode y mini-swe-agent) llevan flags verificados en su documentación oficial y su código a fecha del 2026-10-31. Harbor ya trae agentes para los cuatro, así que el adaptador se reduce a configuración ([ADR-0001](adr/0001-harness-runner.md)).
+> **Resumen.** Todo agente pasa por un único contrato JSON (JSON Schema 2020-12 en [`schemas/`](../schemas)). La entrada lleva repo, commit, tarea OpenSpec, presupuesto, ejecutor y alias de modelo. La salida lleva exit, diff, trayectorias, tokens, coste y procedencia. **El diff (calculado en el host), el coste y la trayectoria normalizada los produce el harness**, no el agente. Los cuatro adaptadores (Claude Code, Codex CLI, OpenCode, mini-swe-agent) usan flags leídos en su documentación y su código el 2026-10-31. Los marcados [Probable] los cierra el spike 1.
 
 ## 1. Por qué un contrato propio
 
 - Ningún CLI garantiza estabilidad semver de su formato de eventos [Probable, [informe](research/software-factory-open-source.md) capa 2]. Por eso se archiva siempre la salida cruda y se normaliza después.
-- Codex no reporta USD [Cierto, el struct `Usage` de `codex exec` no tiene coste]. OpenCode no documenta su esquema de eventos. El coste y los tokens que cuentan salen del **gateway**, que es la única fuente común a todos los agentes ([ADR-0004](adr/0004-gateway.md)).
+- Codex no reporta USD [Cierto, el struct `Usage` de `codex exec` no tiene coste]. OpenCode no documenta su esquema de eventos: los tipos de §5.3 se leyeron en su código, no en una documentación con garantías. El coste y los tokens que cuentan salen del **gateway**, que es la única fuente común a todos los agentes ([ADR-0004](adr/0004-gateway.md)).
 - Cambiar de agente debe ser un cambio de `executor.name` y `executor.version`, sin tocar el verificador ni las métricas (tesis 4).
 
 ## 2. Entrada ([`executor-input.schema.json`](../schemas/executor-input.schema.json))
@@ -16,8 +16,8 @@
 | `repo.url`, `repo.commit` | string, sha de 40 caracteres | `repo.url` de una tarea del piloto es un alias que se resuelve en el almacén privado ([ADR-0009](adr/0009-data-policy-per-repo.md)) |
 | `repo.snapshot` | `"fresh-init"` | El workspace es un `git init` nuevo con un único commit del árbol base: sin remotos, tags ni objetos futuros (amenaza T15, [05](05-verification-design.md)) |
 | `task` | `{format: "openspec", path, sha256, class, visible_tests[]}` | El adaptador **no** lee nada fuera de `proposal.md`, `design.md`, `tasks.md` y `specs/` de la carpeta OpenSpec ([ADR-0005](adr/0005-task-format.md)). Los tests ocultos no forman parte de la tarea |
-| `budget` | `{usd, tokens, wall_s}` | Los `usd` los aplica el gateway (virtual key con `max_budget`). `wall_s` lo aplica el harness (kill del contenedor). `tokens` es un fusible extra donde el CLI lo admite |
-| `executor` | `{name, version, config_sha}` | La versión exacta es obligatoria y el schema rechaza `latest`. `config_sha` es el hash de todo lo que configura el brazo |
+| `budget` | `{usd, wall_s, tokens?, max_turns?}` | Los `usd` los aplica el gateway (virtual key con `max_budget`). `wall_s` lo aplica el harness (kill del contenedor). `tokens` y `max_turns` son opcionales y solo los aplican los CLIs que tienen un flag para ello (`--max-turns` en Claude Code) |
+| `executor` | `{name, version, config_sha}` | Versión semver exacta: el schema rechaza rangos y etiquetas (`latest`, `next`, `^2.1.0`, `2.x`). `config_sha` es el hash de todo lo que configura el brazo |
 | `model.gateway_alias` | string | Un alias que apunta a un único modelo inmutable. El gateway comprueba que el alias está permitido para el `data_class` |
 | `prompt` | `{template_id, sha256}` | La plantilla base es común a todos los adaptadores (§4) |
 | `data_class` | `public · internal · client-product · client-restricted` | Decide qué alias puede usar la virtual key ([ADR-0009](adr/0009-data-policy-per-repo.md)) |
@@ -28,7 +28,7 @@
 | Campo | Quién lo produce | Notas |
 |---|---|---|
 | `exit` | El adaptador, con las reglas de §5 | `done · abort_spec_conflict · budget_exceeded · error` |
-| `diff` | El **harness**: `git diff --binary <base>..<worktree>` | Incluye binarios y cambios de modo **para que el verificador pueda rechazarlos**. No se filtran aquí |
+| `diff` | El **harness, fuera del contenedor** | El workspace se exporta al host al terminar (`docker cp`). En una copia se **sustituye el `.git` del agente por el del snapshot original**, se ejecuta `git add -A -f` (así entran también los ficheros sin trackear y los ignorados) y se calcula `git -c core.attributesFile=/dev/null diff --cached --binary --no-ext-diff --no-textconv <base>`. Así no se usa nada que el agente controle: su `.git`, `.gitattributes`, `diff.external` ni el binario de git del contenedor (amenaza T30). El diff incluye binarios y cambios de modo **para que el verificador pueda rechazarlos**. El `git diff` que el spike 1 genera dentro del contenedor solo vale como smoke |
 | `trajectory.raw_*` | El adaptador copia el stream o fichero del CLI | Se archiva sin tocar |
 | `trajectory.normalized_uri` | El normalizador → [`trajectory-event.schema.json`](../schemas/trajectory-event.schema.json) | Tipos de evento: `lifecycle, message, reasoning, tool_call, tool_result, usage, error` |
 | `tokens` | El gateway; la trayectoria solo si el gateway no tiene el campo | `source` dice de dónde salió |
@@ -62,7 +62,7 @@ Los cuatro corren dentro del contenedor de la tarea. La red solo llega al gatewa
   claude -p "$(cat /workspace/.factory/prompt.md)" \
     --output-format stream-json --verbose \
     --model "$GATEWAY_ALIAS" \
-    --max-turns "$MAX_TURNS" --max-budget-usd "$BUDGET_USD" \
+    --max-turns "$BUDGET_MAX_TURNS" --max-budget-usd "$BUDGET_USD" \
     --permission-mode bypassPermissions
   ```
   Todos estos flags están en la [CLI reference](https://code.claude.com/docs/en/cli-reference) [Cierto]. `--max-budget-usd` se comprueba contra la estimación del cliente, no contra la facturación [Cierto]: es un segundo fusible, y el que manda es el del gateway. `stream-json` exige `--verbose` [Cierto]. Los permisos se omiten porque **el aislamiento lo da el contenedor**, no el CLI.
@@ -160,6 +160,8 @@ Harbor trae agentes llamados `claude-code`, `codex`, `opencode` y `mini-swe-agen
 
 Si el spike 1 confirma que los agentes de Harbor aceptan las versiones y los flags de arriba, **el adaptador es una subclase fina que solo fija versión, flags, `abort.json` y la salida del contrato**. Si no, se escribe la subclase completa con esta especificación.
 
+**Qué ata a Harbor y qué habría que reescribir para salir**: las subclases de `BaseInstalledAgent` (invocación), el lector de `result.json` (tiempos) y el conversor OpenSpec → tarea de Harbor. No dependen de Harbor ni el contrato (schemas), ni el cálculo del diff (se hace en el host, §3), ni el coste (gateway), ni el normalizador, ni el verificador. Con Inspect habría que reescribir esas tres piezas: unos 2–4 días [Suposición].
+
 ## 6. Normalización
 
 | Formato crudo | Origen | Mapeo a `trajectory-event` |
@@ -181,10 +183,14 @@ for n in claude-code codex opencode mini-swe-agent; do
 done
 ```
 
-El 2026-10-31 pasaron los 9 casos, y cuatro casos negativos (versión `latest`, sha corto, aborto sin objeto `abort`, coste con origen `agent`) son rechazados [Cierto, ejecución local].
+```bash
+uv run --with jsonschema python -I -c "import json,jsonschema; s=json.load(open('schemas/trajectory-event.schema.json')); [jsonschema.validate(json.loads(l), s) for l in open('examples/executor/trajectory.example.jsonl')]"
+```
+
+El 2026-10-31 validaron los 3 schemas contra el metaschema, los 8 ficheros de ejemplo y las 4 líneas del JSONL de trayectoria. Además, 7 casos negativos son rechazados (versión `latest`, `^2.1.0` o `2.x`, sha corto, clase de canaria en la entrada, aborto sin objeto `abort`, coste con origen `agent`) [Cierto, ejecución local]. Los ejemplos de Claude Code y Codex usan `data_class: client-product`; los de OpenCode y mini-swe-agent, `public`.
 
 ## Decisiones abiertas
 
-- **Tool calls de Codex a través del puente Responses→chat de LiteLLM con GLM**: si fallan, el brazo Codex pasa a usar un modelo de OpenAI (requiere la autorización de [ADR-0009](adr/0009-data-policy-per-repo.md)) o se sustituye por OpenHands SDK × GLM ([09](09-open-questions.md)).
+- **Tool calls de Codex a través del puente Responses→chat de LiteLLM con GLM**. Plan B único, el mismo en [ADR-0001](adr/0001-harness-runner.md), [06](06-harness-and-tasks.md) y [08](08-risks.md): si falla B3 del spike, el brazo A2 se sustituye por **OpenHands SDK × GLM**, que mantiene el modelo fijo para comparar ejecutores. Si además se autoriza OpenAI (D1, [09](09-open-questions.md)), se añade A2′ Codex × OpenAI.
 - Si la normalización debe mapear a OTel GenAI semconv además del esquema propio. Las semconv no tienen estado de estabilidad declarado [Cierto, informe capa 8], y se pospone a F2.
 - `tokens` en `budget` solo lo aplican los CLIs que tienen un flag para ello. Queda por decidir si el harness corta por tokens leyendo el gasto del gateway en vivo.

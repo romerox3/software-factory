@@ -19,7 +19,7 @@ Cada umbral tiene fórmula, fuente y tamaño de muestra en [01-metrics](01-metri
 | Dimensión | Umbral de éxito (hipótesis) | Métrica |
 |---|---|---|
 | Calidad | La tasa de regresiones posteriores al merge de los cambios de la factory **no supera** la de los PRs humanos del mismo repo (cota superior del IC 95 %) | M4 |
-| Integridad | La tasa de trampa en canarias imposibles tiene una cota superior al 95 % **≤ 2 %** por combinación ejecutor×modelo habilitada | M5 |
+| Integridad | La tasa de trampa en canarias imposibles tiene una cota superior al 95 % **≤ 2 %** por brazo habilitado (ejecutor × modelo × `config_sha`, [01](01-metrics.md) §1) | M5 |
 | Eficiencia | **Coste por cambio aceptado** y porcentaje de PRs mergeados sin edición humana del código, por clase de tarea | M1, M3 |
 | Mantenibilidad | La complejidad, la duplicación y el retrabajo del código tocado por la factory **no empeoran** frente al código humano comparable a 30 y 90 días | M7 |
 | Vanguardia | Ningún cambio de prompt, modelo o pipeline entra sin una ejecución del harness que muestre que no empeora M1–M5 en el conjunto congelado | M8 |
@@ -37,7 +37,7 @@ Cada umbral tiene fórmula, fuente y tamaño de muestra en [01-metrics](01-metri
 
 | Evidencia en contra | Qué dice | Respuesta del diseño |
 |---|---|---|
-| HumanLayer ([wsff.md](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/wsff.md)) | Dejaron de leer el código en julio de 2025, tuvieron caídas y reescribieron. Tesis: «maintainability has no fast oracle» y el RL premia pasar tests, no mantener [Cierto] | La mantenibilidad es una métrica de primera clase (M7) y bloquea el paso a F3. El merge humano es el valor por defecto. Las tareas autónomas son rodajas pequeñas (≤ 200 líneas cambiadas en C1/C2, [06](06-harness-and-tasks.md)) |
+| HumanLayer ([wsff.md](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/wsff.md)) | Dejaron de leer el código en julio de 2025, tuvieron caídas y reescribieron. Tesis: «maintainability has no fast oracle» y el RL premia pasar tests, no mantener [Cierto] | La mantenibilidad es una métrica de primera clase (M7) y bloquea el paso a F3. El merge humano es el valor por defecto. Las tareas autónomas son rodajas pequeñas (≤ 200 líneas cambiadas en C1 y ≤ 300 en C2, [06](06-harness-and-tasks.md) §4) |
 | METR ([RCT](https://arxiv.org/abs/2507.09089)) | Desarrolladores expertos fueron ~19 % más lentos con IA [Probable] | Se mide el tiempo de extremo a extremo con la revisión humana incluida (M6), no el tiempo del agente. No se afirma productividad |
 | Jain ([martinfowler.com](https://martinfowler.com/articles/are-harnesses-worth-the-cost.html)) | El harness no mejoró a un modelo frontier y multiplicó su coste; sí llevó a un modelo barato de 3/10 a 10/10 [Cierto, n=10] | La intensidad del harness (reintentos, best-of-n, revisor) se configura **por modelo** y se mide por coste por cambio aceptado, no por coste por token (F2) |
 | ImpossibleBench ([arXiv 2510.20270](https://arxiv.org/abs/2510.20270)) | Los modelos más capaces explotan más los tests [Probable] | El verificador está aislado por construcción, los tests de aceptación están ocultos y hay una salida explícita de «abortar por conflicto con el spec» ([05](05-verification-design.md)) |

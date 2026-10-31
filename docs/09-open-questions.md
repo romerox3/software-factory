@@ -27,6 +27,8 @@
 | S11 | La torre tiene un kernel con nftables `fib inet`, así que el control de egress de Harbor funcionará allí | [Probable]: falla en macOS | F0-07 |
 | S12 | El modelo local es de clase Qwen3.6-35B-A3B y cabe cuantizado con 64k de contexto en 32 GB | [Suposición] | F0-03 |
 | S13 | El minado del piloto rinde ~20 % de los PRs que tocan tests, como SWE-bench | [Probable] por analogía | F0-05 |
+| S14 | **La cuenta de z.ai que usa el gateway es de API de pago por token**, no un plan de suscripción («coding plan»). El 429 con > 6 concurrentes apunta a un plan con límites [Suposición]. Si es un plan, A2, A3, A6 y los peones chocan con la regla 2 de `CLAUDE.md` («nunca planes de consumo en ejecuciones automáticas») | Revisión independiente | El propietario confirma el tipo de cuenta y, si es un plan, que sus términos permiten uso automatizado; si no, cambiar a la API de pago (R21) |
+| S15 | `/spend/logs` por key está en LiteLLM OSS y da los tokens por petición | [Probable] | F0-03 |
 
 ## 3. Evidencia nueva contra una tesis (pide validación)
 
@@ -54,9 +56,20 @@
 
 ## 5. Hallazgos de la revisión independiente no incorporados
 
-*(Se completa tras la revisión de la sección 9.4 del encargo: cada hallazgo no incorporado, con su argumento.)*
+La revisión independiente (un subagente Sonnet que solo recibió las tesis, los criterios de contenido y los documentos) dio 25 hallazgos el 2026-10-31. **Se incorporaron 20 enteros y 5 en parte.** Entre los incorporados están el canal de feedback con lista blanca (T28), el sandbox de la fase de verificación (T29), el diff calculado en el host (T30), las canarias indistinguibles con la tarea-canaria como unidad, la no-inferioridad con Δ, el arranque de M8, la provisión del verificador (F0-21), las clases C3–C5, el brazo A6, la salida de F3 por M4 y M5, y las filas de GitHub y Hetzner.
+
+Lo que no se incorporó, o solo en parte:
+
+| Hallazgo | Qué se hizo | Argumento |
+|---|---|---|
+| #14 · Añadir un brazo de un segundo proveedor | Solo S14 y R21 | A4 y A5 (modelo local) ya son un segundo proveedor en la comparación. Que los peones dependan de z.ai afecta a cómo se implementa F0, no al sistema que se mide: si z.ai cae, los peones pasan a otro modelo del gateway, siempre con código público |
+| #13 · «≥ 95 % de salidas válidas» mide formato y no calidad | Se mantiene, etiquetado como salud del harness, y se añade el techo de `error_infra` | Es intencionado: F0 tiene que demostrar que el harness produce datos utilizables antes de leer la calidad. La calidad la miden los criterios de falsos `accept` y de pass@1 |
+| #23 · Los ADR no tienen resumen ni «Decisiones abiertas» | Se añadió «Opciones» a los 5 que no la tenían | El encargo fija el formato de los ADR (contexto, opciones, decisión, consecuencias, cómo revertir). El criterio de resumen y «Decisiones abiertas» es de los documentos 00–09 |
+| #24 · A2 frente a A3 queda confundido por el puente Responses | Se declara que el puente forma parte del brazo A2 | No se puede separar: Codex solo admite `wire_api = "responses"`. El efecto del ejecutor sin puente con GLM fijo lo da A6 frente a A3 |
+| #17 · F0-02 construye el servicio de emisión aunque 02 lo condicionaba | Se quitó la condición en 02 | El revisor no pudo comprobarlo, pero el rol de *team admin* es de pago en LiteLLM (código leído en v1.86.2, `notas:conocimiento/infra/litellm-gateway-que-se-puede-hacer.md`) [Cierto], así que el servicio hace falta siempre |
 
 ## Decisiones abiertas
 
 - D1, D2 y D3 de §1.
 - S3 y S4 deben confirmarse antes de F0-17 (minar las tareas reales).
+- S14 debe confirmarse antes de F0-18 (la matriz usa z.ai en tres brazos).

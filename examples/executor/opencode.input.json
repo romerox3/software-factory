@@ -18,7 +18,6 @@
   },
   "budget": {
     "usd": 2.0,
-    "tokens": 2000000,
     "wall_s": 1800
   },
   "executor": {

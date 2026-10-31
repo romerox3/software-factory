@@ -16,8 +16,8 @@
     "normalized_uri": "trajectories/norm/r-mini-s-0001.jsonl"
   },
   "tokens": {
-    "input": 184322,
-    "output": 5120,
+    "input": 1210440,
+    "output": 15022,
     "cache_read": null,
     "cache_write": null,
     "reasoning": null,
@@ -25,14 +25,14 @@
   },
   "cost": {
     "usd_real": 0.0,
-    "usd_shadow": 0.18,
+    "usd_shadow": 2.0,
     "source": "gateway",
     "agent_reported_usd": null
   },
   "timing": {
     "started_at": "2026-11-03T10:00:00Z",
-    "ended_at": "2026-11-03T10:07:12Z",
-    "wall_s": 432
+    "ended_at": "2026-11-03T10:29:58Z",
+    "wall_s": 1798
   },
   "abort": null,
   "provenance": {

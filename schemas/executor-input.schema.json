@@ -5,75 +5,194 @@
   "description": "Everything an executor adapter needs to run one attempt of one task. Written by the harness, never by the agent.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "attempt", "repo", "task", "budget", "executor", "model", "prompt", "data_class"],
+  "required": [
+    "schema_version",
+    "run_id",
+    "attempt",
+    "repo",
+    "task",
+    "budget",
+    "executor",
+    "model",
+    "prompt",
+    "data_class"
+  ],
   "properties": {
-    "schema_version": {"const": "0.1"},
-    "run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{7,63}$"},
-    "attempt": {"type": "integer", "minimum": 1},
+    "schema_version": {
+      "const": "0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{7,63}$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
     "repo": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["url", "commit", "snapshot"],
+      "required": [
+        "url",
+        "commit",
+        "snapshot"
+      ],
       "properties": {
-        "url": {"type": "string", "minLength": 1, "description": "Logical repo id or URL. Private pilot repos use an alias resolved outside this repository."},
-        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "snapshot": {"const": "fresh-init", "description": "The workspace is a new git repo with one commit holding the base tree: no remotes, tags or future objects."}
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Logical repo id or URL. Private pilot repos use an alias resolved outside this repository."
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "snapshot": {
+          "const": "fresh-init",
+          "description": "The workspace is a new git repo with one commit holding the base tree: no remotes, tags or future objects."
+        }
       }
     },
     "task": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["format", "path", "sha256", "class"],
+      "required": [
+        "format",
+        "path",
+        "sha256",
+        "class"
+      ],
       "properties": {
-        "format": {"const": "openspec"},
-        "path": {"type": "string", "description": "Path of the OpenSpec change folder inside the task store, e.g. openspec/changes/<id>/"},
-        "sha256": {"$ref": "#/$defs/sha256"},
-        "class": {"enum": ["C1", "C2", "C3", "C4", "C5", "canary-eligible"]},
-        "visible_tests": {"type": "array", "items": {"type": "string"}, "description": "Repo-relative paths of tests the agent may run but not change."}
+        "format": {
+          "const": "openspec"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path of the OpenSpec change folder inside the task store, e.g. openspec/changes/<id>/"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "class": {
+          "enum": [
+            "C1",
+            "C2",
+            "C4"
+          ],
+          "description": "Task class. Canary status is never part of the input: it lives only in the verifier store."
+        },
+        "visible_tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Repo-relative paths of tests the agent may run but not change."
+        }
       }
     },
     "budget": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["usd", "tokens", "wall_s"],
+      "required": [
+        "usd",
+        "wall_s"
+      ],
       "properties": {
-        "usd": {"type": "number", "exclusiveMinimum": 0, "description": "Cap on real + shadow cost, enforced by the gateway virtual key."},
-        "tokens": {"type": "integer", "minimum": 1},
-        "wall_s": {"type": "integer", "minimum": 1}
+        "usd": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cap on real + shadow cost, enforced by the gateway virtual key."
+        },
+        "tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional fuse, enforced only by executors that support it."
+        },
+        "wall_s": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional; maps to --max-turns where supported."
+        }
       }
     },
     "executor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "config_sha"],
+      "required": [
+        "name",
+        "version",
+        "config_sha"
+      ],
       "properties": {
-        "name": {"enum": ["claude-code", "codex", "opencode", "mini-swe-agent"]},
-        "version": {"type": "string", "minLength": 1, "description": "Exact pinned version; 'latest' is not allowed."},
-        "config_sha": {"$ref": "#/$defs/sha256"}
-      },
-      "not": {"properties": {"version": {"const": "latest"}}}
+        "name": {
+          "enum": [
+            "claude-code",
+            "codex",
+            "opencode",
+            "mini-swe-agent"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
+          "description": "Exact pinned semver (e.g. 0.166.0). Ranges and tags like latest, next or 2.x are rejected."
+        },
+        "config_sha": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     },
     "model": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gateway_alias"],
+      "required": [
+        "gateway_alias"
+      ],
       "properties": {
-        "gateway_alias": {"type": "string", "minLength": 1, "description": "Model alias in the gateway. Must map to one immutable upstream model."}
+        "gateway_alias": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Model alias in the gateway. Must map to one immutable upstream model."
+        }
       }
     },
     "prompt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["template_id", "sha256"],
+      "required": [
+        "template_id",
+        "sha256"
+      ],
       "properties": {
-        "template_id": {"type": "string"},
-        "sha256": {"$ref": "#/$defs/sha256"}
+        "template_id": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
-    "data_class": {"enum": ["public", "internal", "client-product", "client-restricted"]},
-    "abort_path": {"type": "string", "default": "/workspace/.factory/abort.json"}
+    "data_class": {
+      "enum": [
+        "public",
+        "internal",
+        "client-product",
+        "client-restricted"
+      ]
+    },
+    "abort_path": {
+      "type": "string",
+      "default": "/workspace/.factory/abort.json"
+    }
   },
   "$defs": {
-    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
   }
 }

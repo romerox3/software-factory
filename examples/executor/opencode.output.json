@@ -16,23 +16,23 @@
     "normalized_uri": "trajectories/norm/r-openco-0001.jsonl"
   },
   "tokens": {
-    "input": 184322,
-    "output": 5120,
-    "cache_read": 150000,
+    "input": 48210,
+    "output": 1302,
+    "cache_read": 30100,
     "cache_write": null,
     "reasoning": null,
     "source": "gateway"
   },
   "cost": {
     "usd_real": 0.0,
-    "usd_shadow": 0.18,
+    "usd_shadow": 0.03,
     "source": "gateway",
     "agent_reported_usd": null
   },
   "timing": {
     "started_at": "2026-11-03T10:00:00Z",
-    "ended_at": "2026-11-03T10:07:12Z",
-    "wall_s": 432
+    "ended_at": "2026-11-03T10:01:35Z",
+    "wall_s": 95
   },
   "abort": {
     "reason": "tests/test_calc.py::test_round expects 3 for 7/2, spec says round half to even (4)",

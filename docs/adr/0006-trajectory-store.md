@@ -6,9 +6,15 @@
 
 Ningún CLI garantiza estabilidad de su formato de eventos [Probable]. Las trayectorias sirven para diagnosticar coste (M1), buscar patrones de trampa (M5) y, en el futuro, hacer replay. CXDB (Apache-2.0) guarda turnos en un DAG con content-addressing y ramificación, pero no tiene releases, su último push es del 2026-08-28 y el propietario fue adquirido [Cierto/Probable, [03](../03-reuse-inventory.md)].
 
+## Opciones
+
+1. **JSONL en disco**, crudo y normalizado.
+2. **CXDB**: DAG de turnos con content-addressing.
+3. **Backend de trazas** (Langfuse, Opik): guarda spans, no la salida cruda de cada CLI.
+
 ## Decisión
 
-**JSONL crudo** (lo que emite cada CLI, sin tocar) + **JSONL normalizado** ([`trajectory-event.schema.json`](../../schemas/trajectory-event.schema.json)), en disco con `rsync` hacia Hetzner. Las trayectorias del piloto van en el almacén privado. Sin base de datos de trayectorias en F0 ni en F1.
+**JSONL crudo** (lo que emite cada CLI, sin tocar) + **JSONL normalizado** ([`trajectory-event.schema.json`](../../schemas/trajectory-event.schema.json)), en disco en la torre. Hetzner los recoge con `rsync` en modo **pull** (la torre nunca empuja). Las trayectorias del piloto van en el almacén privado. Sin base de datos de trayectorias en F0 ni en F1.
 
 ## Consecuencias
 

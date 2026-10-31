@@ -26,14 +26,15 @@ Motivos:
 - Los cuatro agentes de F0 vienen integrados con su gateway configurable.
 - Falla de forma cerrada con políticas de red que no puede aplicar.
 
-**Condición**: la parte B del spike 1 tiene que confirmar Claude Code y Codex a través del gateway (B1–B4). Si falla B1 o B3 y no tiene arreglo en ≤ 2 h, se pasa a Inspect para el brazo afectado.
+**Condición**: la parte B del spike 1 tiene que confirmar Claude Code a través del gateway (B1, B2, B4). Si falla B1 y no tiene arreglo en ≤ 2 h, se pasa a Inspect. Si falla B3 (Codex con GLM), no se cambia de runner: se aplica el plan B único del brazo A2, OpenHands SDK × GLM ([04](../04-executor-contract.md), decisiones abiertas).
 
 ## Consecuencias
 
 - Un conversor OpenSpec → tarea de Harbor (backlog F0-08).
 - Las tareas de Harbor que se replican a la torre **no llevan `solution/` ni los tests ocultos**.
 - Coste y tokens se toman del gateway, no del `agent_result` de Harbor.
+- El diff no se toma del verificador de Harbor: el harness lo calcula en el host ([04](../04-executor-contract.md) §3).
 
 ## Cómo revertir
 
-Las tareas viven en OpenSpec en el almacén propio, y el contrato de ejecutor no depende de Harbor. Cambiar a Inspect obliga a escribir un `Task` de Inspect que lea la misma tarea y a cambiar el lanzador. El verificador y las métricas no se tocan. Estimación: 1–2 días [Suposición].
+Las tareas viven en OpenSpec en el almacén propio, y los schemas del contrato, el cálculo del diff (en el host), el coste (gateway), el normalizador y el verificador no dependen de Harbor. Lo que sí hay que reescribir son las subclases de agente, el lector de `result.json` y el conversor de tareas. Con Inspect, eso es un `Task` que lea la misma tarea más los agentes de inspect_swe configurados. Estimación: 2–4 días [Suposición].

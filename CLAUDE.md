@@ -47,13 +47,15 @@ for n in claude-code codex opencode mini-swe-agent; do
   uv run --with check-jsonschema check-jsonschema --schemafile schemas/executor-input.schema.json  examples/executor/$n.input.json
   uv run --with check-jsonschema check-jsonschema --schemafile schemas/executor-output.schema.json examples/executor/$n.output.json
 done
-# Potencia de las comparaciones (01-metrics §3)
+uv run --with jsonschema python -I -c "import json,jsonschema; s=json.load(open('schemas/trajectory-event.schema.json')); [jsonschema.validate(json.loads(l), s) for l in open('examples/executor/trajectory.example.jsonl')]"
+# Potencia y margen de no-inferioridad (01-metrics §3)
 uv run --with numpy python -I docs/assets/power_sim.py
+uv run --with numpy python -I docs/assets/power_sim.py --ni
 # Desde F0-01: todo lo anterior y los tests
 make check
 ```
 
-Una tarea del backlog está hecha cuando su **comando de aceptación** termina con exit 0 en un checkout limpio y el orquestador ha revisado el diff. Un cambio en `prompts/`, `pipelines/`, `factory/adapters/`, `factory/verifier/` o en la configuración de modelos necesita además la ejecución de M8 sobre el conjunto congelado ([01](docs/01-metrics.md)).
+Una tarea del backlog está hecha cuando su **comando de aceptación** termina con exit 0 en un checkout limpio y el orquestador ha revisado el diff. Un cambio en `prompts/`, `pipelines/`, `factory/adapters/`, `factory/verifier/` o en la configuración de modelos necesita además la ejecución de M8 sobre el conjunto congelado ([01](docs/01-metrics.md)). M8 rige desde que F0-18 congela el conjunto v1; antes basta el comando de aceptación.
 
 ## Métricas que mandan
 
