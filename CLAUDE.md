@@ -17,13 +17,15 @@ Software factory con agentes de IA: un pipeline determinista que convierte tarea
 | `factory/` (F0) | Código Python 3.12 (`uv`): `gateway/`, `snapshot/`, `miner/`, `tasks/`, `adapters/`, `verifier/`, `normalize/`, `metrics/` |
 | `prompts/` (F0) | Prompts versionados de los ejecutores (`base-v1.md`); cambiar uno dispara M8 |
 | `pipelines/` (F1) | Pipelines DOT (subconjunto Attractor, [ADR-0002](docs/adr/0002-orchestrator.md)) |
+| `infra/` (F0) | Scripts de la torre (`torre/egress.sh`) y del verificador (`verifier/`, con `isolation-check.sh`), sin hosts: los valores van en el almacén privado |
+| `reports/` (F0) | Informes agregados sin contenido del piloto |
 | `.githooks/pre-commit` | Rechaza contenido que coincida con la denylist privada |
 
 ## Reglas
 
 1. **Ningún dato del piloto en este repo.** Las tareas, tests ocultos, holdouts, trayectorias, veredictos, nombres de cliente, hosts e IPs internas van en el almacén privado hermano `../factory-pilot-data/` ([ADR-0009](docs/adr/0009-data-policy-per-repo.md)). Activar el hook: `git config core.hooksPath .githooks`. El hook falla de forma cerrada si no encuentra `../factory-pilot-data/denylist.txt`; solo se omite a propósito con `FACTORY_DENYLIST=none`.
 2. **Sin suscripciones en ejecuciones automáticas.** Todo agente usa una virtual key del gateway con `max_budget`. Nunca OAuth ni planes de consumo.
-3. **El verificador no confía en nada del generador salvo los bytes del diff.** Ningún cambio puede dar al generador acceso a holdouts, tests ocultos, al mirror del verificador ni a su veredicto.
+3. **El verificador no confía en nada del generador salvo los bytes del diff.** Ningún cambio puede dar al generador acceso a holdouts, tests ocultos, al mirror del verificador ni a su veredicto. La única excepción es la categoría de rechazo de la lista blanca de [05](docs/05-verification-design.md) principio 7, para los reintentos.
 4. **Ningún LLM decide el flujo.** Los LLM ejecutan nodos o dan señales blandas que ordenan, nunca convierten un rojo en verde.
 5. **Minimalismo verificable.** Un componente nuevo entra con la métrica que mueve o la restricción que cumple en la tabla de [02](docs/02-architecture.md) §7. Si no tiene, no entra.
 6. **Versiones fijadas**: CLIs, modelos (alias → modelo inmutable), imágenes por digest. Cambiar una versión crea un brazo nuevo y pasa por M8.
