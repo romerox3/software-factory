@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Rejects staged content that matches the private denylist (client names, internal
+# hosts, private IPs). The denylist itself lives outside this repo, so publishing
+# the repo never publishes the list.
+set -euo pipefail
+list="${FACTORY_DENYLIST:-$(git rev-parse --show-toplevel)/../factory-pilot-data/denylist.txt}"
+if [ "$list" = none ]; then exit 0; fi
+if [ ! -f "$list" ]; then
+  echo "pre-commit: denylist not found at $list (set FACTORY_DENYLIST=none to skip explicitly)" >&2
+  exit 1
+fi
+patterns="$(grep -v '^\s*#' "$list" | grep -v '^\s*$' || true)"
+[ -n "$patterns" ] || exit 0
+hits="$(git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++' | grep -inEf <(printf '%s\n' "$patterns") || true)"
+names="$(git diff --cached --name-only | grep -iEf <(printf '%s\n' "$patterns") || true)"
+if [ -n "$hits$names" ]; then
+  echo "pre-commit: staged content matches the private denylist:" >&2
+  [ -n "$names" ] && printf '  path: %s\n' $names >&2
+  [ -n "$hits" ] && printf '%s\n' "$hits" | cut -c1-160 | sed 's/^/  /' >&2
+  exit 1
+fi
