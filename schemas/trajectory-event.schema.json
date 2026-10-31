@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory.local/schemas/trajectory-event.schema.json",
+  "title": "Normalized trajectory event",
+  "description": "One line of a normalized trajectory. The raw trajectory is always archived next to it; this format may drop executor-specific detail.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "seq", "kind"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "seq": {"type": "integer", "minimum": 0},
+    "ts": {"type": ["string", "null"], "format": "date-time"},
+    "kind": {"enum": ["lifecycle", "message", "reasoning", "tool_call", "tool_result", "usage", "error"]},
+    "role": {"enum": ["system", "user", "assistant", "tool", null]},
+    "tool": {"type": ["string", "null"], "description": "Normalized tool name: shell, read, write, edit, search, web, other"},
+    "tool_raw": {"type": ["string", "null"], "description": "Tool name as the executor reported it"},
+    "text": {"type": ["string", "null"], "description": "Content, truncated to 16 KiB; full content stays in the raw file"},
+    "exit_code": {"type": ["integer", "null"]},
+    "tokens": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "input": {"type": "integer", "minimum": 0},
+        "output": {"type": "integer", "minimum": 0},
+        "cache_read": {"type": "integer", "minimum": 0},
+        "cache_write": {"type": "integer", "minimum": 0},
+        "reasoning": {"type": "integer", "minimum": 0}
+      }
+    },
+    "raw_ref": {"type": ["string", "null"], "description": "Pointer to the raw line (line number or event id)"}
+  }
+}

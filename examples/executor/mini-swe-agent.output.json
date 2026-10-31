@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1",
+  "run_id": "r-mini-s-0001",
+  "exit": "budget_exceeded",
+  "exit_detail": "gateway budget exceeded (virtual key max_budget)",
+  "diff": {
+    "uri": "runs/r-mini-s-0001/diff.patch",
+    "sha256": "sha256:51e759773cb27708001a4a731d2c3e5144b3e9c15fe2dacdb3068a83628817dd",
+    "files_changed": 0,
+    "lines_added": 0,
+    "lines_removed": 0
+  },
+  "trajectory": {
+    "raw_uri": "trajectories/raw/r-mini-s-0001.jsonl",
+    "raw_format": "mini-traj-json",
+    "normalized_uri": "trajectories/norm/r-mini-s-0001.jsonl"
+  },
+  "tokens": {
+    "input": 184322,
+    "output": 5120,
+    "cache_read": null,
+    "cache_write": null,
+    "reasoning": null,
+    "source": "gateway"
+  },
+  "cost": {
+    "usd_real": 0.0,
+    "usd_shadow": 0.18,
+    "source": "gateway",
+    "agent_reported_usd": null
+  },
+  "timing": {
+    "started_at": "2026-11-03T10:00:00Z",
+    "ended_at": "2026-11-03T10:07:12Z",
+    "wall_s": 432
+  },
+  "abort": null,
+  "provenance": {
+    "harness_version": "0.1.0",
+    "executor_name": "mini-swe-agent",
+    "executor_version": "2.4.6",
+    "model_alias": "local-qwen-coder",
+    "model_resolved": "qwen3.6-35b-a3b",
+    "prompt_sha": "sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2",
+    "config_sha": "sha256:c6e537f3c887895f2551d16d50965a756b71ea8a8a0dd0e35a2d9a6541f91540",
+    "task_sha": "sha256:0ebb429fa86d481c2630fac53db1c91cffed5d4d41d1021c179444eb67e7ee0b",
+    "image_digest": "sha256:b29814cf5792e684cd75d6a7fce7a67a11887e312f87ca2ac2496d81f365ff72"
+  }
+}

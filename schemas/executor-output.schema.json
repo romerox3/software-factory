@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory.local/schemas/executor-output.schema.json",
+  "title": "Executor run output",
+  "description": "Result of one attempt. Diff, cost and normalized trajectory are produced by the harness, not reported by the agent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "exit", "diff", "trajectory", "tokens", "cost", "timing", "provenance"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "run_id": {"type": "string"},
+    "exit": {"enum": ["done", "abort_spec_conflict", "budget_exceeded", "error"]},
+    "exit_detail": {"type": "string", "description": "Executor-specific reason, e.g. claude subtype error_max_turns or gateway budget error."},
+    "diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "sha256", "files_changed", "lines_added", "lines_removed"],
+      "properties": {
+        "uri": {"type": "string", "description": "git diff <base>..<worktree> computed by the harness, binary and mode changes included so the verifier can reject them."},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "files_changed": {"type": "integer", "minimum": 0},
+        "lines_added": {"type": "integer", "minimum": 0},
+        "lines_removed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "trajectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_uri", "raw_format", "normalized_uri"],
+      "properties": {
+        "raw_uri": {"type": "string"},
+        "raw_format": {"enum": ["claude-stream-json", "codex-exec-jsonl", "opencode-run-json", "mini-traj-json"]},
+        "normalized_uri": {"type": "string", "description": "JSONL of trajectory-event.schema.json"}
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output", "source"],
+      "properties": {
+        "input": {"type": "integer", "minimum": 0},
+        "output": {"type": "integer", "minimum": 0},
+        "cache_read": {"type": ["integer", "null"], "minimum": 0},
+        "cache_write": {"type": ["integer", "null"], "minimum": 0},
+        "reasoning": {"type": ["integer", "null"], "minimum": 0},
+        "source": {"enum": ["gateway", "trajectory"], "description": "gateway is authoritative; trajectory only when the gateway lacks the field."}
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["usd_real", "usd_shadow", "source"],
+      "properties": {
+        "usd_real": {"type": "number", "minimum": 0},
+        "usd_shadow": {"type": "number", "minimum": 0, "description": "List-price cost for free, flat-rate or local models."},
+        "source": {"const": "gateway"},
+        "agent_reported_usd": {"type": ["number", "null"], "minimum": 0, "description": "What the CLI says (e.g. Claude total_cost_usd); for reconciliation only."}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at", "ended_at", "wall_s"],
+      "properties": {
+        "started_at": {"type": "string", "format": "date-time"},
+        "ended_at": {"type": "string", "format": "date-time"},
+        "wall_s": {"type": "number", "minimum": 0}
+      }
+    },
+    "abort": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": {"type": "string", "minLength": 1},
+        "spec_refs": {"type": "array", "items": {"type": "string"}},
+        "test_refs": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["harness_version", "executor_name", "executor_version", "model_alias", "model_resolved", "prompt_sha", "config_sha", "task_sha", "image_digest"],
+      "properties": {
+        "harness_version": {"type": "string"},
+        "executor_name": {"type": "string"},
+        "executor_version": {"type": "string"},
+        "model_alias": {"type": "string"},
+        "model_resolved": {"type": "string", "description": "Upstream model id the gateway actually called."},
+        "prompt_sha": {"$ref": "#/$defs/sha256"},
+        "config_sha": {"$ref": "#/$defs/sha256"},
+        "task_sha": {"$ref": "#/$defs/sha256"},
+        "image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"exit": {"const": "abort_spec_conflict"}}},
+     "then": {"required": ["abort"], "properties": {"abort": {"type": "object"}}}}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

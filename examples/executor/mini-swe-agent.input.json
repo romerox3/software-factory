@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.1",
+  "run_id": "r-mini-s-0001",
+  "attempt": 1,
+  "repo": {
+    "url": "fixture/python-calc",
+    "commit": "3f2a000000000000000000000000000000000000",
+    "snapshot": "fresh-init"
+  },
+  "task": {
+    "format": "openspec",
+    "path": "openspec/changes/fix-division-rounding/",
+    "sha256": "sha256:0ebb429fa86d481c2630fac53db1c91cffed5d4d41d1021c179444eb67e7ee0b",
+    "class": "C1",
+    "visible_tests": [
+      "tests/test_calc.py"
+    ]
+  },
+  "budget": {
+    "usd": 2.0,
+    "tokens": 2000000,
+    "wall_s": 1800
+  },
+  "executor": {
+    "name": "mini-swe-agent",
+    "version": "2.4.6",
+    "config_sha": "sha256:c6e537f3c887895f2551d16d50965a756b71ea8a8a0dd0e35a2d9a6541f91540"
+  },
+  "model": {
+    "gateway_alias": "local-qwen-coder"
+  },
+  "prompt": {
+    "template_id": "base-v1",
+    "sha256": "sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2"
+  },
+  "data_class": "public",
+  "abort_path": "/workspace/.factory/abort.json"
+}

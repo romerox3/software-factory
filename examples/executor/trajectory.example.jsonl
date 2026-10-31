@@ -1,0 +1,4 @@
+{"run_id": "r-claude-0001", "seq": 0, "ts": "2026-11-03T10:00:00Z", "kind": "lifecycle", "role": null, "tool": null, "tool_raw": null, "text": "start", "exit_code": null, "tokens": null, "raw_ref": "line:1"}
+{"run_id": "r-claude-0001", "seq": 1, "ts": "2026-11-03T10:00:05Z", "kind": "tool_call", "role": "assistant", "tool": "shell", "tool_raw": "Bash", "text": "pytest -q tests/test_calc.py", "exit_code": null, "tokens": null, "raw_ref": "line:4"}
+{"run_id": "r-claude-0001", "seq": 2, "ts": "2026-11-03T10:00:09Z", "kind": "tool_result", "role": "tool", "tool": "shell", "tool_raw": "Bash", "text": "1 failed", "exit_code": 1, "tokens": null, "raw_ref": "line:5"}
+{"run_id": "r-claude-0001", "seq": 3, "ts": "2026-11-03T10:07:12Z", "kind": "usage", "role": null, "tool": null, "tool_raw": null, "text": null, "exit_code": null, "tokens": {"input": 184322, "output": 5120, "cache_read": 150000, "cache_write": 0, "reasoning": 0}, "raw_ref": "result"}

@@ -1,0 +1,57 @@
+{
+  "schema_version": "0.1",
+  "run_id": "r-openco-0001",
+  "exit": "abort_spec_conflict",
+  "exit_detail": "abort.json present",
+  "diff": {
+    "uri": "runs/r-openco-0001/diff.patch",
+    "sha256": "sha256:f7c1200c1435da828e1189fd315b759285ba0cc582da33396a5babac8ed7bceb",
+    "files_changed": 0,
+    "lines_added": 0,
+    "lines_removed": 0
+  },
+  "trajectory": {
+    "raw_uri": "trajectories/raw/r-openco-0001.jsonl",
+    "raw_format": "opencode-run-json",
+    "normalized_uri": "trajectories/norm/r-openco-0001.jsonl"
+  },
+  "tokens": {
+    "input": 184322,
+    "output": 5120,
+    "cache_read": 150000,
+    "cache_write": null,
+    "reasoning": null,
+    "source": "gateway"
+  },
+  "cost": {
+    "usd_real": 0.0,
+    "usd_shadow": 0.18,
+    "source": "gateway",
+    "agent_reported_usd": null
+  },
+  "timing": {
+    "started_at": "2026-11-03T10:00:00Z",
+    "ended_at": "2026-11-03T10:07:12Z",
+    "wall_s": 432
+  },
+  "abort": {
+    "reason": "tests/test_calc.py::test_round expects 3 for 7/2, spec says round half to even (4)",
+    "spec_refs": [
+      "specs/calc/spec.md#rounding"
+    ],
+    "test_refs": [
+      "tests/test_calc.py::test_round"
+    ]
+  },
+  "provenance": {
+    "harness_version": "0.1.0",
+    "executor_name": "opencode",
+    "executor_version": "1.19.5",
+    "model_alias": "local-qwen-coder",
+    "model_resolved": "qwen3.6-35b-a3b",
+    "prompt_sha": "sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2",
+    "config_sha": "sha256:88cd351c19608659515cc4265c3f612cd2056c8c29193105fbbe1a3c8e75e491",
+    "task_sha": "sha256:0ebb429fa86d481c2630fac53db1c91cffed5d4d41d1021c179444eb67e7ee0b",
+    "image_digest": "sha256:b29814cf5792e684cd75d6a7fce7a67a11887e312f87ca2ac2496d81f365ff72"
+  }
+}

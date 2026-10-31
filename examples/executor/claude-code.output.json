@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1",
+  "run_id": "r-claude-0001",
+  "exit": "done",
+  "exit_detail": "subtype=success",
+  "diff": {
+    "uri": "runs/r-claude-0001/diff.patch",
+    "sha256": "sha256:82f86d1f4ebd47f5cb75c541c6bd2b0d1e512fa5fab23213734af916766bba52",
+    "files_changed": 1,
+    "lines_added": 6,
+    "lines_removed": 2
+  },
+  "trajectory": {
+    "raw_uri": "trajectories/raw/r-claude-0001.jsonl",
+    "raw_format": "claude-stream-json",
+    "normalized_uri": "trajectories/norm/r-claude-0001.jsonl"
+  },
+  "tokens": {
+    "input": 184322,
+    "output": 5120,
+    "cache_read": 150000,
+    "cache_write": null,
+    "reasoning": null,
+    "source": "gateway"
+  },
+  "cost": {
+    "usd_real": 0.61,
+    "usd_shadow": 0.0,
+    "source": "gateway",
+    "agent_reported_usd": 0.6
+  },
+  "timing": {
+    "started_at": "2026-11-03T10:00:00Z",
+    "ended_at": "2026-11-03T10:07:12Z",
+    "wall_s": 432
+  },
+  "abort": null,
+  "provenance": {
+    "harness_version": "0.1.0",
+    "executor_name": "claude-code",
+    "executor_version": "2.1.316",
+    "model_alias": "anthropic-sonnet",
+    "model_resolved": "claude-sonnet-5-5",
+    "prompt_sha": "sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2",
+    "config_sha": "sha256:b136e391bc68df922a59996a43cd2dfa69f06bff0feceeb01224f7b5a1a9eb8f",
+    "task_sha": "sha256:0ebb429fa86d481c2630fac53db1c91cffed5d4d41d1021c179444eb67e7ee0b",
+    "image_digest": "sha256:b29814cf5792e684cd75d6a7fce7a67a11887e312f87ca2ac2496d81f365ff72"
+  }
+}
