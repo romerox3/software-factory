@@ -12,11 +12,15 @@ from typing import Any
 
 import jsonschema
 
+from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TASK_SCHEMA_PATH = REPO_ROOT / "schemas" / "task.schema.json"
 
 HIDDEN_DIR_NAME = "hidden"
 HIDDEN_FILE_NAMES = frozenset({"test.patch", "gold.patch", "f2p.json", "p2p.json", "verifier.json"})
+SNAPSHOT_NAME = "snapshot"
+SNAPSHOT_GIT_NAME = "snapshot.git"
 
 
 def to_harbor(visible_task_dir: Path, out_dir: Path) -> Path:
@@ -34,18 +38,28 @@ def to_harbor(visible_task_dir: Path, out_dir: Path) -> Path:
 
     instruction = _build_instruction(visible_task_dir, task_id)
     task_toml = _build_task_toml(task)
-    dockerfile = _build_dockerfile(task["image"])
+    workdir = workdir_of(task)
+    snapshot = _snapshot_git(visible_task_dir)
+    if snapshot is None and workdir != DEFAULT_WORKDIR:
+        raise ValueError(
+            f"{task_id} needs {SNAPSHOT_NAME}/.git for workdir {workdir!r}: "
+            "the image's own history must not reach the agent"
+        )
+    dockerfile = _build_dockerfile(task, workdir, snapshot is not None)
     test_script = _build_test_script(task["visible_tests"]["command"])
 
     out_dir.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=out_dir, prefix=f".{task_id}."))
     try:
         staging.chmod(0o755)
-        (staging / "environment").mkdir()
+        environment = staging / "environment"
+        environment.mkdir()
         (staging / "tests").mkdir()
         (staging / "instruction.md").write_text(instruction, encoding="utf-8")
         (staging / "task.toml").write_text(task_toml, encoding="utf-8")
-        (staging / "environment" / "Dockerfile").write_text(dockerfile, encoding="utf-8")
+        (environment / "Dockerfile").write_text(dockerfile, encoding="utf-8")
+        if snapshot is not None:
+            shutil.copytree(snapshot, environment / SNAPSHOT_GIT_NAME, symlinks=True)
         script_path = staging / "tests" / "test.sh"
         script_path.write_text(test_script, encoding="utf-8")
         script_path.chmod(0o755)
@@ -107,8 +121,22 @@ def _build_task_toml(task: dict[str, Any]) -> str:
     )
 
 
-def _build_dockerfile(image: str) -> str:
-    return f"FROM {image}\n\nWORKDIR /workspace\n"
+def _build_dockerfile(task: dict[str, Any], workdir: str, has_snapshot: bool) -> str:
+    """Real images get their history replaced by the fresh-init snapshot (T15)."""
+    lines = [f"FROM {task['image']}", ""]
+    if workdir != DEFAULT_WORKDIR:
+        commit = task["repo"]["commit"]
+        lines.append(f"RUN cd {shlex.quote(workdir)} && git checkout -qf {commit} && rm -rf .git")
+    if has_snapshot:
+        lines.append(f"COPY {SNAPSHOT_GIT_NAME} {workdir}/.git")
+    lines.append(f"WORKDIR {workdir}")
+    return "\n".join(lines) + "\n"
+
+
+def _snapshot_git(task_dir: Path) -> Path | None:
+    """Return the ``.git`` of the fresh-init snapshot, if the task has one."""
+    snapshot = task_dir / SNAPSHOT_NAME / ".git"
+    return snapshot if snapshot.is_dir() else None
 
 
 def _build_test_script(command: str) -> str:

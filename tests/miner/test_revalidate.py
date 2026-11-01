@@ -12,6 +12,7 @@ import pytest
 
 from factory.miner.revalidate import revalidate
 from factory.miner.runner import LocalRunner
+from factory.tasks.workdir import DEFAULT_WORKDIR
 
 REPO_ROOT = Path(__file__).parents[2]
 PY_CALC = REPO_ROOT / "fixtures" / "repos" / "py-calc"
@@ -53,6 +54,31 @@ def copy_round_task(store: Path) -> None:
 
 def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_revalidation_passes_the_task_workdir_to_the_runner(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    task_path = store / "visible" / TASK_ID / "factory.task.json"
+    task = read_json(task_path)
+    task["repo"]["workdir"] = "/testbed"
+    task_path.write_text(json.dumps(task), encoding="utf-8")
+
+    class RecordingRunner:
+        def __init__(self) -> None:
+            self.inner = LocalRunner()
+            self.workdirs: list[str] = []
+
+        def run(self, repo_dir, test_command, junit_path, timeout_sec, *, workdir=DEFAULT_WORKDIR):
+            self.workdirs.append(workdir)
+            return self.inner.run(repo_dir, test_command, junit_path, timeout_sec)
+
+    runner = RecordingRunner()
+
+    result = revalidate(store, TASK_ID, PY_CALC, runner, seed=1)
+
+    assert result["valid"] is True
+    assert runner.workdirs == ["/testbed"] * 6
 
 
 def test_round_fixture_revalidates_as_valid(tmp_path: Path) -> None:

@@ -20,8 +20,10 @@ from typing import Any, Literal
 import jsonschema
 from huggingface_hub import snapshot_download
 
+from factory.tasks.workdir import DEFAULT_WORKDIR
+
 Source = Literal["rebench", "multilang"]
-Framework = Literal["pytest", "jest", "vitest"]
+Framework = Literal["pytest", "vitest"]
 TaskClass = Literal["C1", "C2"]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -30,26 +32,22 @@ VERIFIER_SCHEMA_PATH = REPO_ROOT / "schemas" / "verifier-task.schema.json"
 
 JUNIT_PATH = "/logs/verifier/junit.xml"
 DEFAULT_VERIFIER_TIMEOUT_SEC = 600
+DEFAULT_REBENCH_TEST_COMMAND = "python -m pytest -q"
+DEFAULT_EXCLUDED_PATH_REGEXES = (r"(^|/)auth/", r"(^|/)billing/", r"(^|/)infra/")
 
 REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 TASK_ID_PATTERN = re.compile(r"[^a-z0-9._-]")
+JUNIT_FLAG = re.compile(r"--junitxml(?:=|\s+)\S+")
+VITEST_REPORTER_FLAG = re.compile(r"--reporter(?:=|\s+)\S+")
+VITEST_OUTPUT_FLAG = re.compile(r"--outputFile(?:=|\s+)\S+")
 
 _CLASS_LIMITS: tuple[tuple[TaskClass, int, int], ...] = (
     ("C1", 3, 200),
     ("C2", 5, 300),
 )
 
-_FRAMEWORKS: tuple[Framework, ...] = ("jest", "vitest")
-
-_VERIFIER_COMMANDS: dict[Framework, str] = {
-    "pytest": "python -m pytest -q --junitxml=/logs/verifier/junit.xml",
-    "jest": "JEST_JUNIT_OUTPUT=/logs/verifier/junit.xml npx jest --ci --reporters=jest-junit",
-    "vitest": "npx vitest run --reporter=junit --outputFile=/logs/verifier/junit.xml",
-}
-
 _FALLBACK_TEST_COMMANDS: dict[Framework, str] = {
     "pytest": "python -m pytest -q",
-    "jest": "npx jest --ci",
     "vitest": "npx vitest run",
 }
 
@@ -81,6 +79,7 @@ class Candidate:
     framework: Framework
     verifier_timeout_sec: int
     forbidden_globs: list[str]
+    workdir: str = DEFAULT_WORKDIR
 
 
 @dataclass(frozen=True)
@@ -106,6 +105,29 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
 
         return parquet.read_table(path).to_pylist()
     raise ValueError(f"unsupported dataset export: {path}")
+
+
+def load_split(download: Path, split: str) -> list[dict[str, Any]]:
+    """Read every ``.parquet``/``.jsonl`` file that belongs to ``split``.
+
+    Hugging Face stores a split either as a directory (``ts/...``) or as a file
+    named after it (``2026_03.parquet``), so both the path parts and the stem are
+    checked.
+    """
+    download = Path(download)
+    files = [
+        path
+        for path in sorted(download.rglob("*"))
+        if path.is_file()
+        and path.suffix.lower() in {".parquet", ".jsonl"}
+        and (split in path.relative_to(download).parts or split in path.stem)
+    ]
+    if not files:
+        raise FileNotFoundError(f"no dataset file for split {split!r} under {download}")
+    rows: list[dict[str, Any]] = []
+    for path in files:
+        rows.extend(load_rows(path))
+    return rows
 
 
 def download_split(dataset: str, revision: str, split: str, dest: Path) -> Path:
@@ -178,7 +200,7 @@ def write_task(
         "task_id": task_id,
         "class": candidate.task_class,
         "data_class": "public",
-        "repo": {"commit": candidate.base_commit},
+        "repo": {"commit": candidate.base_commit, "workdir": candidate.workdir},
         "image": candidate.image,
         "visible_tests": {"command": candidate.visible_command, "ids": []},
         "budget": dict(budget),
@@ -280,7 +302,7 @@ def _evaluate(
 
     framework = _framework(row, source)
     if framework is None:
-        return Rejection(instance_id, "unknown_framework")
+        return Rejection(instance_id, "unsupported_test_command")
 
     test_patch = str(row.get("test_patch") or "")
     return Candidate(
@@ -298,7 +320,7 @@ def _evaluate(
         problem_statement=str(row.get("problem_statement") or ""),
         interface=_interface(row.get("interface")),
         visible_command=_visible_command(row, source, framework),
-        verifier_command=_VERIFIER_COMMANDS[framework],
+        verifier_command=_verifier_command(row, source, framework),
         framework=framework,
         verifier_timeout_sec=_verifier_timeout(row, source),
         forbidden_globs=sorted(set(_patch_files(test_patch))),
@@ -387,24 +409,59 @@ def _interface(value: Any) -> str:
 def _framework(row: Mapping[str, Any], source: Source) -> Framework | None:
     if source == "rebench":
         return "pytest"
-    log_parser = str(row.get("log_parser") or "").lower()
-    from_parser = _single_framework(log_parser)
-    if from_parser is not None:
-        return from_parser
-    commands = " ".join(_string_list(row.get("test_cmds"))).lower()
-    return _single_framework(commands)
+    return _command_framework(" ".join(_string_list(row.get("test_cmds"))))
 
 
-def _single_framework(text: str) -> Framework | None:
-    named = [name for name in _FRAMEWORKS if name in text]
-    return named[0] if len(named) == 1 else None
+def _command_framework(commands: str) -> Framework | None:
+    text = commands.lower()
+    found = [name for name in ("pytest", "vitest") if name in text]
+    return found[0] if len(found) == 1 else None
+
+
+def _verifier_command(row: Mapping[str, Any], source: Source, framework: Framework) -> str:
+    if source == "multilang":
+        command = " && ".join(_string_list(row.get("test_cmds")))
+        command = (
+            _with_vitest_junit(command) if framework == "vitest" else _with_pytest_junit(command)
+        )
+        rebuild = " && ".join(cmd for cmd in _string_list(row.get("rebuild_cmds")) if cmd.strip())
+        return f"{rebuild} && {command}" if rebuild else command
+    return _with_pytest_junit(_rebench_test_command(row))
+
+
+def _rebench_test_command(row: Mapping[str, Any]) -> str:
+    install_config = row.get("install_config")
+    if isinstance(install_config, str):
+        try:
+            install_config = json.loads(install_config)
+        except ValueError:
+            install_config = None
+    if isinstance(install_config, Mapping):
+        command = str(install_config.get("test_cmd") or "").strip()
+        if command:
+            return command
+    return DEFAULT_REBENCH_TEST_COMMAND
+
+
+def _with_pytest_junit(command: str) -> str:
+    if JUNIT_FLAG.search(command):
+        return JUNIT_FLAG.sub(f"--junitxml={JUNIT_PATH}", command)
+    return f"{command} --junitxml={JUNIT_PATH}"
+
+
+def _with_vitest_junit(command: str) -> str:
+    command = VITEST_REPORTER_FLAG.sub("", command)
+    command = VITEST_OUTPUT_FLAG.sub("", command)
+    command = re.sub(r"\s+", " ", command).strip()
+    return f"{command} --reporter=junit --outputFile={JUNIT_PATH}"
 
 
 def _visible_command(row: Mapping[str, Any], source: Source, framework: Framework) -> str:
-    if source == "multilang":
-        commands = _string_list(row.get("test_cmds"))
-        if commands:
-            return " && ".join(commands)
+    if source == "rebench":
+        return _rebench_test_command(row)
+    commands = _string_list(row.get("test_cmds"))
+    if commands:
+        return " && ".join(commands)
     return _FALLBACK_TEST_COMMANDS[framework]
 
 

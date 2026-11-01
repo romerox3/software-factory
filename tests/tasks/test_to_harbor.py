@@ -165,3 +165,52 @@ def test_invalid_task_is_rejected(tmp_path: Path, field: str, value: str) -> Non
         to_harbor(task_dir, out_dir)
 
     assert not out_dir.exists()
+
+
+def add_snapshot(task_dir: Path) -> Path:
+    snapshot_git = task_dir / "snapshot" / ".git"
+    snapshot_git.mkdir(parents=True)
+    (snapshot_git / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    return snapshot_git
+
+
+def test_default_workdir_copies_the_snapshot_and_needs_no_checkout(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    add_snapshot(task_dir)
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
+    assert dockerfile == (
+        f"FROM {TASK['image']}\n\nCOPY snapshot.git /workspace/.git\nWORKDIR /workspace\n"
+    )
+    assert (generated / "environment" / "snapshot.git" / "HEAD").is_file()
+
+
+def test_real_workdir_checks_out_the_base_and_replaces_the_history(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    add_snapshot(task_dir)
+    write_task_config(task_dir, repo={**TASK["repo"], "workdir": "/testbed"})
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
+    commit = TASK["repo"]["commit"]
+    assert dockerfile == (
+        f"FROM {TASK['image']}\n"
+        "\n"
+        f"RUN cd /testbed && git checkout -qf {commit} && rm -rf .git\n"
+        "COPY snapshot.git /testbed/.git\n"
+        "WORKDIR /testbed\n"
+    )
+    assert (generated / "environment" / "snapshot.git" / "HEAD").is_file()
+
+
+def test_real_workdir_without_snapshot_is_rejected(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    write_task_config(task_dir, repo={**TASK["repo"], "workdir": "/testbed"})
+
+    with pytest.raises(ValueError, match="snapshot"):
+        to_harbor(task_dir, tmp_path / "out")
+
+    assert not (tmp_path / "out" / "demo-task").exists()

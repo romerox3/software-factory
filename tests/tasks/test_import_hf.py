@@ -1,6 +1,7 @@
 """Importing public HF rows must keep the hidden part out of the visible tree."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -74,16 +75,63 @@ def test_sample_rows_yield_the_expected_tasks_and_rejections() -> None:
     }
 
 
-def test_multilang_framework_is_read_from_the_parser_or_the_commands() -> None:
+def test_multilang_framework_comes_from_the_test_command_and_jest_is_rejected() -> None:
     rows = load_rows(MULTILANG)
 
     selected, rejections = select_all(rows, source="multilang")
 
     assert [(candidate.instance_id, candidate.framework) for candidate in selected] == [
-        ("acme__webui-2001", "vitest"),
-        ("acme__webui-2002", "jest"),
+        ("acme__webui-2001", "vitest")
     ]
-    assert [rejection.reason for rejection in rejections] == ["unknown_framework"]
+    assert {rejection.instance_id: rejection.reason for rejection in rejections} == {
+        "acme__webui-2002": "unsupported_test_command",
+        "acme__webui-2003": "unsupported_test_command",
+    }
+    candidate = selected[0]
+    assert candidate.visible_command == "npx vitest run"
+    assert candidate.verifier_command == (
+        "npm ci && npx vitest run --reporter=junit --outputFile=/logs/verifier/junit.xml"
+    )
+
+
+def test_multilang_vitest_command_replaces_other_reporters() -> None:
+    row = dict(load_rows(MULTILANG)[0])
+    row["test_cmds"] = ["npx vitest run --reporter=default --outputFile=report.json"]
+
+    selected, rejections = select(
+        [row],
+        source="multilang",
+        cutoff=CUTOFF,
+        digests=digests_for([row]),
+        excluded_path_regexes=EXCLUDED_PATH_REGEXES,
+        seed=0,
+        limit=1,
+    )
+
+    assert rejections == []
+    assert selected[0].verifier_command == (
+        "npm ci && npx vitest run --reporter=junit --outputFile=/logs/verifier/junit.xml"
+    )
+
+
+def test_rebench_uses_the_rows_own_test_command() -> None:
+    row = dict(load_rows(REBENCH)[0])
+    row["install_config"] = {"test_cmd": "pytest -q tests/test_widgets.py"}
+
+    selected, _ = select(
+        [row],
+        source="rebench",
+        cutoff=CUTOFF,
+        digests=digests_for([row]),
+        excluded_path_regexes=EXCLUDED_PATH_REGEXES,
+        seed=0,
+        limit=1,
+    )
+
+    assert selected[0].verifier_command == (
+        "pytest -q tests/test_widgets.py --junitxml=/logs/verifier/junit.xml"
+    )
+    assert selected[0].visible_command == "pytest -q tests/test_widgets.py"
 
 
 def test_sampling_is_stable_for_one_seed_and_can_change_with_another() -> None:
@@ -149,6 +197,10 @@ def test_write_task_keeps_the_hidden_material_out_of_the_visible_tree(
     task = json.loads((visible / "factory.task.json").read_text(encoding="utf-8"))
     assert task["class"] == "C1"
     assert task["image"] == f"ghcr.io/acme/widgets-1001@{candidate.digest}"
+    assert task["repo"] == {
+        "commit": candidate.base_commit,
+        "workdir": "/workspace",
+    }
     assert task["visible_tests"] == {"command": "python -m pytest -q", "ids": []}
     assert task["source"] == {
         "dataset": REBENCH_DATASET,
@@ -206,6 +258,22 @@ def test_write_task_validates_against_the_schema(tmp_path: Path) -> None:
             dataset=REBENCH_DATASET,
             revision=REVISION,
             budget={"usd": 0, "max_turns": 24, "timeout_sec": 600},
+        )
+
+    assert not (tmp_path / "store").exists()
+
+
+def test_workdir_must_be_an_absolute_path(tmp_path: Path) -> None:
+    rows = load_rows(REBENCH)
+    selected, _ = select_all(rows)
+
+    with pytest.raises(ValueError):
+        write_task(
+            replace(selected[0], workdir="testbed"),
+            tmp_path / "store",
+            dataset=REBENCH_DATASET,
+            revision=REVISION,
+            budget=BUDGET,
         )
 
     assert not (tmp_path / "store").exists()

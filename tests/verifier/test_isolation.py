@@ -51,6 +51,16 @@ def test_docker_arguments_are_the_isolated_ones(sandbox, tmp_path) -> None:
     assert args[args.index("--log-driver") + 1] == "none"  # no unbounded copy of stdout on the host
 
 
+def test_the_workspace_mounts_at_the_task_workdir(sandbox, tmp_path) -> None:
+    request = RunRequest(
+        "sha256:" + "a" * 64, tmp_path / "w", tmp_path / "l", "true", 10, workdir="/testbed"
+    )
+    args = sandbox.docker_args(request, "name")
+    mounts = [args[i + 1] for i, value in enumerate(args) if value == "-v"]
+    assert mounts[0] == f"{tmp_path / 'w'}:/testbed:rw"
+    assert args[args.index("-w") + 1] == "/testbed"
+
+
 def test_extra_mounts_are_read_only_and_pythonpath_extends_the_image_one(sandbox, tmp_path) -> None:
     request = RunRequest(
         "sha256:" + "a" * 64,

@@ -21,6 +21,7 @@ from factory.junit import Status
 from factory.miner.leak import detect_leak
 from factory.miner.runner import RunnerError, TestRunner
 from factory.snapshot.fresh_init import build_snapshot
+from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
 _MISSING = "missing"
 _FAILING_STATES = frozenset({"failed", "error", _MISSING})
@@ -53,6 +54,7 @@ def revalidate(
     test_command = str(verifier["test_command"])
     junit_path = str(verifier["junit_path"])
     timeout_sec = int(verifier["timeout_sec"])
+    workdir = _workdir(visible / "factory.task.json")
 
     runs: dict[str, list[dict[str, Status]]] = {"base": [], "gold": []}
     result: dict[str, Any] = {
@@ -82,9 +84,13 @@ def revalidate(
 
         try:
             for _ in range(repetitions):
-                runs["base"].append(runner.run(base_work, test_command, junit_path, timeout_sec))
+                runs["base"].append(
+                    runner.run(base_work, test_command, junit_path, timeout_sec, workdir=workdir)
+                )
             for _ in range(repetitions):
-                runs["gold"].append(runner.run(gold_work, test_command, junit_path, timeout_sec))
+                runs["gold"].append(
+                    runner.run(gold_work, test_command, junit_path, timeout_sec, workdir=workdir)
+                )
         except RunnerError:
             result["reason"] = "runner_error"
             _write_json(hidden / "revalidation.json", result)
@@ -117,6 +123,15 @@ def revalidate(
 
     _write_json(hidden / "revalidation.json", result)
     return result
+
+
+def _workdir(task_path: Path) -> str:
+    """Read ``repo.workdir`` from the visible task written by the importer."""
+    try:
+        document = json.loads(task_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return DEFAULT_WORKDIR
+    return workdir_of(document)
 
 
 def _derive(

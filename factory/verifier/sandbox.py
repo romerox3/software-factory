@@ -44,6 +44,8 @@ class RunRequest:
     logs_dir: Path
     command: str
     timeout_s: int
+    # Container path where the workspace is mounted: the task's ``repo.workdir``.
+    workdir: str = WORKSPACE_MOUNT
     # Extra environment (verifier-controlled; ``PYTHONPATH`` is prepended to the image's own).
     env: tuple[tuple[str, str], ...] = ()
     # Host directories mounted read-only at the given container path (verifier-controlled).
@@ -140,13 +142,13 @@ class DockerSandbox:
             "--log-driver",
             "none",  # the daemon would otherwise keep an unbounded copy of stdout on the host
             "-v",
-            f"{request.workspace}:{WORKSPACE_MOUNT}:rw",
+            f"{request.workspace}:{request.workdir}:rw",
             "-v",
             f"{request.logs_dir}:{LOGS_MOUNT}:rw",
         ]
         for host_dir, container_dir in request.read_only_mounts:
             args += ["-v", f"{host_dir}:{container_dir}:ro"]
-        args += ["-w", WORKSPACE_MOUNT]
+        args += ["-w", request.workdir]
         for key, value in environment.items():
             args += ["-e", f"{key}={value}"]
         args += [request.image, "sh", "-c", WRAPPER, "wrapper", request.command]

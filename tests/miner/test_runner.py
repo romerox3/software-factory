@@ -78,3 +78,63 @@ def test_docker_runner_builds_an_isolated_command(
         "-w",
     ]
     assert statuses == {"tests/test_ok.py::test_ok": "passed"}
+
+
+def test_docker_runner_mounts_a_write_dir_for_an_absolute_junit_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repo(tmp_path).resolve()
+    captured: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured.append(command)
+        logs = _mounts(command)["/logs/verifier"]
+        (logs / "junit.xml").write_text(
+            '<testsuite><testcase classname="tests.test_ok" name="test_ok" /></testsuite>',
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_run)
+
+    statuses = DockerRunner("python:3.12-slim").run(
+        repo,
+        PYTEST.replace("junit.xml", "/logs/verifier/junit.xml"),
+        "/logs/verifier/junit.xml",
+        60,
+    )
+
+    assert statuses == {"tests/test_ok.py::test_ok": "passed"}
+    assert captured[0][captured[0].index("-w") + 1] == "/workspace"
+    assert "/logs/verifier" in _mounts(captured[0])
+
+
+def test_docker_runner_mounts_the_workspace_at_the_task_workdir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repo(tmp_path).resolve()
+    captured: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured.append(command)
+        (repo / "junit.xml").write_text(
+            '<testsuite><testcase classname="tests.test_ok" name="test_ok" /></testsuite>',
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_run)
+
+    statuses = DockerRunner("python:3.12-slim").run(
+        repo, PYTEST, "junit.xml", 60, workdir="/testbed"
+    )
+
+    assert statuses == {"tests/test_ok.py::test_ok": "passed"}
+    assert _mounts(captured[0])["/testbed"] == repo
+    assert captured[0][captured[0].index("-w") + 1] == "/testbed"
+
+
+def _mounts(command: list[str]) -> dict[str, Path]:
+    mounts = [command[index + 1] for index, arg in enumerate(command) if arg == "-v"]
+    pairs = (mount.rsplit(":", 1) for mount in mounts)
+    return {container: Path(host) for host, container in pairs}

@@ -37,6 +37,12 @@
         "commit": {
           "type": "string",
           "pattern": "^[0-9a-f]{40}$"
+        },
+        "workdir": {
+          "description": "Absolute path of the repository inside the image. Optional; the default keeps the toy fixtures working.",
+          "type": "string",
+          "pattern": "^/[^\\s]*$",
+          "default": "/workspace"
         }
       }
     },

@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from pathlib import Path
+import tempfile
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from factory.junit import Status, parse_junit
+from factory.tasks.workdir import DEFAULT_WORKDIR
 from factory.testids import pytest_node_id
 
-DOCKER_WORKDIR = "/workspace"
+LOGS_MOUNT = "/logs/verifier"
 
 
 class RunnerError(RuntimeError):
@@ -32,6 +34,8 @@ class TestRunner(Protocol):
         test_command: str,
         junit_path: str,
         timeout_sec: int,
+        *,
+        workdir: str = DEFAULT_WORKDIR,
     ) -> dict[str, Status]:
         """Run the tests and return ``{test_id: status}``."""
         ...
@@ -46,6 +50,8 @@ class LocalRunner:
         test_command: str,
         junit_path: str,
         timeout_sec: int,
+        *,
+        workdir: str = DEFAULT_WORKDIR,
     ) -> dict[str, Status]:
         repo_dir = Path(repo_dir)
         report = _resolve_report(repo_dir, junit_path)
@@ -78,44 +84,59 @@ class DockerRunner:
         test_command: str,
         junit_path: str,
         timeout_sec: int,
+        *,
+        workdir: str = DEFAULT_WORKDIR,
     ) -> dict[str, Status]:
         repo_dir = Path(repo_dir).resolve()
         report = _resolve_report(repo_dir, junit_path)
-        _remove_stale_report(report)
-        command = docker_command(self.image, repo_dir, test_command)
-        try:
-            subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
+        with tempfile.TemporaryDirectory(prefix="factory-junit-") as tmp:
+            logs_dir = None
+            if _under_logs(junit_path):
+                logs_dir = Path(tmp)
+                report = logs_dir / PurePosixPath(junit_path).name
+            _remove_stale_report(report)
+            command = docker_command(
+                self.image, repo_dir, test_command, workdir=workdir, logs_dir=logs_dir
             )
-        except subprocess.TimeoutExpired as exc:
-            raise RunnerError(f"docker run timed out after {timeout_sec}s") from exc
-        except OSError as exc:
-            raise RunnerError(f"could not run docker: {exc}") from exc
-        return _read_report(report, repo_dir)
+            try:
+                subprocess.run(
+                    command,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise RunnerError(f"docker run timed out after {timeout_sec}s") from exc
+            except OSError as exc:
+                raise RunnerError(f"could not run docker: {exc}") from exc
+            return _read_report(report, repo_dir)
 
 
-def docker_command(image: str, repo_dir: Path, test_command: str) -> list[str]:
+def docker_command(
+    image: str,
+    repo_dir: Path,
+    test_command: str,
+    *,
+    workdir: str = DEFAULT_WORKDIR,
+    logs_dir: Path | None = None,
+) -> list[str]:
     """Build the isolated ``docker run`` invocation for ``test_command``."""
     repo_dir = Path(repo_dir).resolve()
-    return [
+    command = [
         "docker",
         "run",
         "--rm",
         "--network",
         "none",
         "-v",
-        f"{repo_dir}:{DOCKER_WORKDIR}",
+        f"{repo_dir}:{workdir}",
         "-w",
-        DOCKER_WORKDIR,
-        image,
-        "bash",
-        "-c",
-        test_command,
+        workdir,
     ]
+    if logs_dir is not None:
+        command += ["-v", f"{Path(logs_dir).resolve()}:{LOGS_MOUNT}"]
+    return [*command, image, "bash", "-c", test_command]
 
 
 def docker_available() -> bool:
@@ -128,6 +149,10 @@ def _resolve_report(repo_dir: Path, junit_path: str) -> Path:
     if report.is_absolute():
         return report
     return Path(repo_dir) / report
+
+
+def _under_logs(junit_path: str) -> bool:
+    return junit_path.startswith(LOGS_MOUNT + "/")
 
 
 def _remove_stale_report(report: Path) -> None:

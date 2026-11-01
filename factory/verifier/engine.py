@@ -14,6 +14,7 @@ Fail-closed rules that shape this module:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
@@ -26,6 +27,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from factory.junit import MAX_REPORT_BYTES, parse_junit
+from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 from factory.testids import pytest_node_id
 from factory.verifier import diffguard, gitops, sast, stream
 from factory.verifier.gitops import InfraError, PatchError
@@ -590,6 +592,16 @@ def _node_statuses(statuses: dict[str, str], workspace: Path, task: Task) -> dic
     return {pytest_node_id(test_id, workspace): status for test_id, status in statuses.items()}
 
 
+def _task_workdir(state: _State) -> str:
+    """The visible task carries ``repo.workdir``; the hidden task store does not load it."""
+    path = state.task_store / "visible" / state.task_id / "factory.task.json"
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return DEFAULT_WORKDIR
+    return workdir_of(document)
+
+
 def _prepare_plugin(state: _State) -> tuple[Path, str]:
     """A read-only directory holding the result plugin under a name no diff can predict."""
     module = "fv_" + secrets.token_hex(8)
@@ -640,6 +652,7 @@ def _execute(
                 logs_dir=logs,
                 command=real_command,
                 timeout_s=task.timeout_s,
+                workdir=_task_workdir(state),
                 env=env,
                 read_only_mounts=mounts,
             )
