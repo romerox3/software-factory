@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory.local/schemas/verifier-task.schema.json",
+  "title": "Verifier task (hidden part)",
+  "description": "hidden/<task_id>/verifier.json. Never replicated to the generator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "test_command",
+    "framework",
+    "junit_path",
+    "timeout_sec",
+    "diff_guard",
+    "mutation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,80}$"
+    },
+    "test_command": {
+      "type": "string"
+    },
+    "framework": {
+      "enum": ["pytest", "jest", "vitest"]
+    },
+    "junit_path": {
+      "type": "string"
+    },
+    "timeout_sec": {
+      "type": "integer",
+      "minimum": 60
+    },
+    "diff_guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forbidden_globs"],
+      "properties": {
+        "forbidden_globs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

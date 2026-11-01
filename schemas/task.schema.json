@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory.local/schemas/task.schema.json",
+  "title": "Factory task (visible part)",
+  "description": "factory.task.json inside a visible task directory. Everything here is replicated to the generator; the hidden part lives in verifier.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "class",
+    "data_class",
+    "repo",
+    "image",
+    "visible_tests",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,80}$"
+    },
+    "class": {
+      "enum": ["C1", "C2", "C4"]
+    },
+    "data_class": {
+      "enum": ["public", "internal", "client-product", "client-restricted"]
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit"],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$"
+    },
+    "visible_tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "ids"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["usd", "max_turns", "timeout_sec"],
+      "properties": {
+        "usd": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_sec": {
+          "type": "integer",
+          "minimum": 60
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "revision", "instance_id"],
+      "properties": {
+        "dataset": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "instance_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

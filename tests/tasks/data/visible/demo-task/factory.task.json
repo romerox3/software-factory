@@ -1,0 +1,24 @@
+{
+  "schema_version": "1",
+  "task_id": "demo-task",
+  "class": "C1",
+  "data_class": "public",
+  "repo": {
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "image": "python:3.12-slim@sha256:9c84b6a5a6c3b0e2d6f4a8c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1",
+  "visible_tests": {
+    "command": "python -m pytest -q tests/visible",
+    "ids": ["tests/visible/test_demo.py::test_rounds_half_to_even"]
+  },
+  "budget": {
+    "usd": 1.5,
+    "max_turns": 24,
+    "timeout_sec": 300
+  },
+  "source": {
+    "dataset": "example/demo",
+    "revision": "main",
+    "instance_id": "demo-task-1"
+  }
+}

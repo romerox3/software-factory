@@ -1,0 +1,7 @@
+diff --git a/tests/test_demo.py b/tests/test_demo.py
+--- a/tests/test_demo.py
++++ b/tests/test_demo.py
+@@ -1,2 +1,3 @@
+ def test_rounds_half_to_even():
+-    assert True
++    assert True  # HIDDEN-MARKER-42

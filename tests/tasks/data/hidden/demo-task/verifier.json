@@ -1,0 +1,14 @@
+{
+  "schema_version": "1",
+  "task_id": "demo-task",
+  "test_command": "python -m pytest -q tests/test_demo.py --junitxml=/logs/verifier/junit.xml",
+  "framework": "pytest",
+  "junit_path": "/logs/verifier/junit.xml",
+  "timeout_sec": 120,
+  "diff_guard": {
+    "forbidden_globs": ["tests/**", "conftest.py"]
+  },
+  "mutation": {
+    "enabled": false
+  }
+}
