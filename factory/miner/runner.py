@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Protocol
 
 from factory.junit import Status, parse_junit
+from factory.testids import pytest_node_id
 
 DOCKER_WORKDIR = "/workspace"
 
@@ -141,20 +142,4 @@ def _read_report(report: Path, repo_dir: Path) -> dict[str, Status]:
         statuses = parse_junit(report)
     except (OSError, ValueError) as exc:
         raise RunnerError(f"could not parse JUnit report at {report}: {exc}") from exc
-    return {_pytest_node_id(test_id, repo_dir): status for test_id, status in statuses.items()}
-
-
-def _pytest_node_id(test_id: str, repo_dir: Path) -> str:
-    """Turn pytest's dotted classname into a pytest node id when it maps to a file."""
-    prefix, separator, rest = test_id.partition("::")
-    repo_dir = Path(repo_dir)
-    if (repo_dir / prefix).is_file():
-        return test_id
-    parts = prefix.split(".")
-    for index in range(len(parts), 0, -1):
-        candidate = repo_dir.joinpath(*parts[:index]).with_suffix(".py")
-        if candidate.is_file():
-            tail = parts[index:] + ([rest] if separator else [])
-            relative = candidate.relative_to(repo_dir).as_posix()
-            return "::".join([relative, *tail])
-    return test_id
+    return {pytest_node_id(test_id, repo_dir): status for test_id, status in statuses.items()}

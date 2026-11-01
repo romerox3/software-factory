@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory.local/schemas/verdict.schema.json",
+  "title": "Verifier verdict",
+  "description": "verdict.json written by the verifier next to its own store, never inside the generator's reach. The required block is what the metrics read; every other field is optional. An accept must be isolated, fully hashed and carry no category.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_id",
+    "arm",
+    "attempt",
+    "repetition",
+    "verdict",
+    "reason",
+    "verify_cost_usd",
+    "diff_sha"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,80}$" },
+    "arm": { "type": "string", "minLength": 1 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "repetition": { "type": "integer", "minimum": 0 },
+    "verdict": { "enum": ["accept", "reject", "cheat_suspected", "error_infra"] },
+    "reason": { "type": "string" },
+    "verify_cost_usd": { "type": "number", "minimum": 0 },
+    "diff_sha": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "category": {
+      "enum": [
+        "patch_invalid",
+        "empty_diff",
+        "diff_guard",
+        "sast",
+        "abort_spec_conflict",
+        "abort_honored",
+        "cost_inconsistent",
+        "canary_green",
+        "canary_resisted",
+        "hidden_checks_failed",
+        "timeout",
+        "oom",
+        "junit_missing",
+        "junit_invalid",
+        "junit_forged",
+        "evaluation_error",
+        "infra"
+      ]
+    },
+    "rule_ids": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(dg|sast)\\.[a-z0-9-]+$" }
+    },
+    "feedback": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type"],
+                    "properties": { "type": { "const": "patch_invalid" } }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "rule_ids"],
+                    "properties": {
+                      "type": { "const": "diff_guard" },
+                      "rule_ids": {
+                        "type": "array",
+                        "items": { "type": "string", "pattern": "^dg\\.[a-z0-9-]+$" }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "id", "status"],
+                    "properties": {
+                      "type": { "const": "visible_test" },
+                      "id": { "type": "string" },
+                      "status": { "enum": ["failed", "error", "skipped", "missing"] }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "message"],
+                    "properties": {
+                      "type": { "const": "hidden_checks" },
+                      "message": { "const": "fallan comprobaciones ocultas" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diff": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "test_patch": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "verifier": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "image": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "isolated": { "type": "boolean" },
+    "canary": { "type": "boolean" },
+    "verifier_version": { "type": "string" },
+    "duration_s": { "type": "number", "minimum": 0 },
+    "hard": { "type": "object" },
+    "diagnostics": { "type": "object" },
+    "informative": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mutation": { "type": "object" },
+        "sast": { "type": "object" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "verdict": { "const": "accept" } }, "required": ["verdict"] },
+      "then": {
+        "required": ["hashes", "isolated", "hard"],
+        "properties": {
+          "isolated": { "const": true },
+          "hashes": {
+            "required": ["diff", "test_patch", "verifier", "image"],
+            "properties": {
+              "diff": { "type": "string" },
+              "test_patch": { "type": "string" },
+              "verifier": { "type": "string" },
+              "image": { "type": "string" }
+            }
+          }
+        },
+        "not": { "required": ["category"] }
+      }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "reject" } }, "required": ["verdict"] },
+      "then": { "required": ["category"] }
+    }
+  ]
+}

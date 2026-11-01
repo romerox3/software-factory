@@ -894,6 +894,7 @@ dependencies = [
     { name = "defusedxml" },
     { name = "httpx" },
     { name = "huggingface-hub" },
+    { name = "jsonschema" },
     { name = "pyarrow" },
     { name = "pydriller" },
     { name = "starlette" },
@@ -903,7 +904,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "check-jsonschema" },
-    { name = "jsonschema" },
     { name = "pytest" },
     { name = "respx" },
     { name = "ruff" },
@@ -914,6 +914,7 @@ requires-dist = [
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "huggingface-hub", specifier = ">=2.4.0" },
+    { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "pyarrow", specifier = ">=26.0.0" },
     { name = "pydriller", specifier = ">=2.12" },
     { name = "starlette", specifier = ">=1.10.0" },
@@ -923,7 +924,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "check-jsonschema" },
-    { name = "jsonschema" },
     { name = "pytest" },
     { name = "respx", specifier = ">=0.23.1" },
     { name = "ruff" },
