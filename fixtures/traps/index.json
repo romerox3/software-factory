@@ -1,0 +1,162 @@
+[
+  {
+    "threat": "T01",
+    "fixture": "cheat-edit-test",
+    "kind": "diff"
+  },
+  {
+    "threat": "T01",
+    "fixture": "cheat-delete-test",
+    "kind": "diff"
+  },
+  {
+    "threat": "T02",
+    "fixture": "cheat-skip-marker",
+    "kind": "diff"
+  },
+  {
+    "threat": "T03",
+    "fixture": "cheat-eq-override",
+    "kind": "diff"
+  },
+  {
+    "threat": "T04",
+    "fixture": "cheat-hardcode",
+    "kind": "diff"
+  },
+  {
+    "threat": "T05",
+    "fixture": "cheat-heuristic",
+    "kind": "diff"
+  },
+  {
+    "threat": "T06",
+    "fixture": "cheat-monkeypatch-runner",
+    "kind": "diff"
+  },
+  {
+    "threat": "T07",
+    "fixture": "cheat-detect-test-env",
+    "kind": "diff"
+  },
+  {
+    "threat": "T08",
+    "fixture": "cheat-conftest-exit",
+    "kind": "diff"
+  },
+  {
+    "threat": "T09",
+    "fixture": "cheat-ignored-conftest",
+    "kind": "diff"
+  },
+  {
+    "threat": "T10",
+    "fixture": "cheat-symlink-test",
+    "kind": "diff"
+  },
+  {
+    "threat": "T11",
+    "fixture": "cheat-npm-postinstall",
+    "kind": "diff"
+  },
+  {
+    "threat": "T12",
+    "fixture": "cheat-runner-path",
+    "kind": "diff"
+  },
+  {
+    "threat": "T13",
+    "fixture": "cheat-edit-spec",
+    "kind": "diff"
+  },
+  {
+    "threat": "T14",
+    "fixture": "cheat-pycache",
+    "kind": "diff"
+  },
+  {
+    "threat": "T15",
+    "fixture": "leak-git-history",
+    "kind": "probe"
+  },
+  {
+    "threat": "T16",
+    "fixture": "leak-network",
+    "kind": "probe"
+  },
+  {
+    "threat": "T17",
+    "fixture": "leak-holdout-path",
+    "kind": "probe"
+  },
+  {
+    "threat": "T18",
+    "fixture": "cheat-write-verdict",
+    "kind": "diff"
+  },
+  {
+    "threat": "T19",
+    "fixture": "cheat-lockfile",
+    "kind": "diff"
+  },
+  {
+    "threat": "T20",
+    "fixture": "cheat-sitecustomize",
+    "kind": "diff"
+  },
+  {
+    "threat": "T21",
+    "fixture": "cheat-addopts",
+    "kind": "diff"
+  },
+  {
+    "threat": "T22",
+    "fixture": "inject-judge",
+    "kind": "diff"
+  },
+  {
+    "threat": "T23",
+    "fixture": "empty-diff",
+    "kind": "run-output"
+  },
+  {
+    "threat": "T24",
+    "fixture": "poison-cache",
+    "kind": "diff"
+  },
+  {
+    "threat": "T25",
+    "fixture": "false-abort",
+    "kind": "run-output"
+  },
+  {
+    "threat": "T26",
+    "fixture": null,
+    "kind": "process"
+  },
+  {
+    "threat": "T27",
+    "fixture": "fake-cost",
+    "kind": "run-output"
+  },
+  {
+    "threat": "T28",
+    "fixture": "feedback-leak",
+    "kind": "probe"
+  },
+  {
+    "threat": "T29",
+    "fixture": "read-hidden-tests",
+    "kind": "diff"
+  },
+  {
+    "threat": "T29",
+    "fixture": "forge-junit",
+    "kind": "diff"
+  },
+  {
+    "threat": "T30",
+    "fixture": "tamper-gitattributes",
+    "kind": "diff"
+  }
+]

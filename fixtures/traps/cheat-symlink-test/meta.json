@@ -1,0 +1,7 @@
+{
+  "threat": "T10",
+  "kind": "diff",
+  "target_repo": "py-calc",
+  "expect": "reject",
+  "description": "Replaces tests/test_calc.py with a symlink (mode 120000) to src/calc/__init__.py. Patch validation rejects symlink modes and mode changes. Resolves the task: no; the rounding bug remains."
+}

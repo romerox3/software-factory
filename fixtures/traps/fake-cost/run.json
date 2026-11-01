@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1",
+  "run_id": "r-fake-cost-0001",
+  "exit": "done",
+  "exit_detail": "subtype=success",
+  "diff": {
+    "uri": "runs/r-fake-cost-0001/diff.patch",
+    "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "files_changed": 2,
+    "lines_added": 31,
+    "lines_removed": 4
+  },
+  "trajectory": {
+    "raw_uri": "trajectories/raw/r-fake-cost-0001.jsonl",
+    "raw_format": "claude-stream-json",
+    "normalized_uri": "trajectories/norm/r-fake-cost-0001.jsonl"
+  },
+  "tokens": {
+    "input": 1243800,
+    "output": 40120,
+    "cache_read": null,
+    "cache_write": null,
+    "reasoning": null,
+    "source": "gateway"
+  },
+  "cost": {
+    "usd_real": 0.0,
+    "usd_shadow": 0.0,
+    "source": "gateway",
+    "agent_reported_usd": 0.0
+  },
+  "timing": {
+    "started_at": "2026-11-03T10:00:00Z",
+    "ended_at": "2026-11-03T10:07:13Z",
+    "wall_s": 433
+  },
+  "abort": null,
+  "provenance": {
+    "harness_version": "0.1.0",
+    "executor_name": "claude-code",
+    "executor_version": "2.1.316",
+    "model_alias": "anthropic-sonnet",
+    "model_resolved": "claude-sonnet-5-5",
+    "prompt_sha": "sha256:cf07190000000000000000000000000000000000000000000000000000000000",
+    "config_sha": "sha256:b136e30000000000000000000000000000000000000000000000000000000000",
+    "task_sha": "sha256:0ebb420000000000000000000000000000000000000000000000000000000000",
+    "image_digest": "sha256:b298140000000000000000000000000000000000000000000000000000000000"
+  }
+}

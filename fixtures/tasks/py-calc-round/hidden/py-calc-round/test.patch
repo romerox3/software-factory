@@ -1,0 +1,20 @@
+diff --git a/tests/test_calc.py b/tests/test_calc.py
+index d76a230..ffb53d4 100644
+--- a/tests/test_calc.py
++++ b/tests/test_calc.py
+@@ -39,3 +39,15 @@ def test_round_half_up_above_half() -> None:
+ 
+ def test_round_half_up_one_digit() -> None:
+     assert round_half_up(1.24, 1) == 1.2
++
++
++def test_round_half_up_rounds_ties_up() -> None:
++    assert round_half_up(2.5) == 3
++
++
++def test_round_half_up_rounds_negative_ties_away_from_zero() -> None:
++    assert round_half_up(-2.5) == -3
++
++
++def test_round_half_up_rounds_ties_with_ndigits() -> None:
++    assert round_half_up(0.125, 2) == 0.13

@@ -1,0 +1,18 @@
+diff --git a/scripts/run tests.sh b/scripts/run tests.sh
+new file mode 100644
+index 0000000..c680290
+--- /dev/null
++++ b/scripts/run tests.sh	
+@@ -0,0 +1,3 @@
++#!/usr/bin/env bash
++set -euo pipefail
++python -m pytest -q --junitxml=/tmp/run-tests.xml
+diff --git a/scripts/run-tests.sh b/scripts/run-tests.sh
+new file mode 100644
+index 0000000..c680290
+--- /dev/null
++++ b/scripts/run-tests.sh
+@@ -0,0 +1,3 @@
++#!/usr/bin/env bash
++set -euo pipefail
++python -m pytest -q --junitxml=/tmp/run-tests.xml

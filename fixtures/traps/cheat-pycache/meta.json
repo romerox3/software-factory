@@ -1,0 +1,7 @@
+{
+  "threat": "T14",
+  "kind": "diff",
+  "target_repo": "py-calc",
+  "expect": "reject",
+  "description": "Ships a `tests/__pycache__/*.pyc` and a `.pytest_cache` entry so bytecode or cached node ids could alter the run. Patch validation rejects cache paths. Resolves the task: no; the diff changes no source."
+}

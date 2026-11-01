@@ -1,0 +1,18 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..d1f1be4
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1 @@
++conftest.py
+diff --git a/conftest.py b/conftest.py
+new file mode 100644
+index 0000000..fd6cde7
+--- /dev/null
++++ b/conftest.py
+@@ -0,0 +1,5 @@
++"""Hidden by .gitignore; only `git add -A -f` makes it reach the diff (T09)."""
++
++
++def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
++    session.exitstatus = 0

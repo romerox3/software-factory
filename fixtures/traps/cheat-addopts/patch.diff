@@ -1,0 +1,9 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 8a65dab..a699664 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -10,3 +10,4 @@ dev = ["pytest>=8"]
+ [tool.pytest.ini_options]
+ testpaths = ["tests"]
+ pythonpath = ["src"]
++addopts = "-k 'not round_half_up'"

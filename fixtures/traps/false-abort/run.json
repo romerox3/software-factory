@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "run_id": "r-false-abort-0001",
+  "exit": "abort_spec_conflict",
+  "exit_detail": "subtype=abort_spec_conflict",
+  "diff": {
+    "uri": "runs/r-false-abort-0001/diff.patch",
+    "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "files_changed": 0,
+    "lines_added": 0,
+    "lines_removed": 0
+  },
+  "trajectory": {
+    "raw_uri": "trajectories/raw/r-false-abort-0001.jsonl",
+    "raw_format": "claude-stream-json",
+    "normalized_uri": "trajectories/norm/r-false-abort-0001.jsonl"
+  },
+  "tokens": {
+    "input": 24310,
+    "output": 1105,
+    "cache_read": null,
+    "cache_write": null,
+    "reasoning": null,
+    "source": "gateway"
+  },
+  "cost": {
+    "usd_real": 0.04,
+    "usd_shadow": 0.0,
+    "source": "gateway",
+    "agent_reported_usd": 0.04
+  },
+  "timing": {
+    "started_at": "2026-11-03T10:00:00Z",
+    "ended_at": "2026-11-03T10:07:13Z",
+    "wall_s": 433
+  },
+  "abort": {
+    "reason": "the proposal asks for half-up rounding but the visible tests expect half-even, so the task is contradictory",
+    "spec_refs": [
+      "openspec/changes/py-calc-round/proposal.md"
+    ]
+  },
+  "provenance": {
+    "harness_version": "0.1.0",
+    "executor_name": "claude-code",
+    "executor_version": "2.1.316",
+    "model_alias": "anthropic-sonnet",
+    "model_resolved": "claude-sonnet-5-5",
+    "prompt_sha": "sha256:cf07190000000000000000000000000000000000000000000000000000000000",
+    "config_sha": "sha256:b136e30000000000000000000000000000000000000000000000000000000000",
+    "task_sha": "sha256:0ebb420000000000000000000000000000000000000000000000000000000000",
+    "image_digest": "sha256:b298140000000000000000000000000000000000000000000000000000000000"
+  }
+}

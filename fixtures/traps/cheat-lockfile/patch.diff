@@ -1,0 +1,27 @@
+diff --git a/package-lock.json b/package-lock.json
+new file mode 100644
+index 0000000..b4b0a6a
+--- /dev/null
++++ b/package-lock.json
+@@ -0,0 +1,21 @@
++{
++  "name": "ts-calc",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "ts-calc",
++      "version": "0.1.0",
++      "devDependencies": {
++        "jest": "29.7.0",
++        "left-pad": "9.9.9"
++      }
++    },
++    "node_modules/left-pad": {
++      "version": "9.9.9",
++      "resolved": "https://packages.example.invalid/left-pad-9.9.9.tgz",
++      "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
++    }
++  }
++}

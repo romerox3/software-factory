@@ -1,0 +1,32 @@
+diff --git a/.pytest_cache/v/cache/lastfailed b/.pytest_cache/v/cache/lastfailed
+new file mode 100644
+index 0000000..0967ef4
+--- /dev/null
++++ b/.pytest_cache/v/cache/lastfailed
+@@ -0,0 +1 @@
++{}
+diff --git a/src/calc/__pycache__/calc.cpython-312.pyc b/src/calc/__pycache__/calc.cpython-312.pyc
+new file mode 100644
+index 0000000000000000000000000000000000000000..f190f05e12a5a39e2c173d72168fbaa339d3e3fd
+GIT binary patch
+literal 1227
+zcmZ8g&u<e)6rS0&y_-0;Vi3?@YNn_XT7+XD;sE_2A%(O`(zMND3Dt+q#=A~7I6LOe
+zE{SuB)Jv;gkZ4e)_Q0|H5B(#Ia-bb?YZ2mBDM(!V-q=ooC++Mv``*lc-#2fLDwRow
+zQLjJW`pjbNZ<>t59s+)}fZ%}n44BV-Yl$yfU<tzZlD$}f!eSAMICuTRdu*!!B}7Go
+z9Dl-}^h<=dIJg^*SKh1NOwzt+huwDG4KoQMS8*glB|_0jcC#E}0dY^N1atk_7sSEi
+zx*Vpd%)%^@sq!pcS^c`XG9P?-eR&~hexsfFxSed{mMGyk2%`jkL<$esEndg>$GF+b
+zBlgJBJk)$$QIQb3)o7|1R3l6?nI;nCb_}vHAFJD$>@`%Uz9Zpw263z!os0ELmm0IG
+z4Pn;aY*3=nlZldPy&bkU<KtAYA-mCRudnSeieL(V<l>_yaM)*mmZyHavcG(U6ZQsc
+zGTpGgfZ%{NxzDfNVk|5(*5Xu6;agWmIOeDebEwN+0aCL!9VK@Yg+__>zSu(@XkYC+
+ze9w=*-vE#RhRjet;08>WXk8S;G){=E`Tz%H>bO5#|NidN>dZh~KCI3S+_@2Xs9?bx
+z<Q@EA$Ui`E@H$~WCcH`l--;$b&&K)GY8A)n{{^>bXA{li%JGU-a`dfeS}oJp^x3zr
+z9@|AW?JcazJdMQK+V0w#$RvU^N;Z;A;WQdHlDZ&vl5A6CNvs4=IrZpH*cTn_4dd$U
+z3pxVy);0Mg-SA34)OAT=cgO3x*y+kJ)3(Y$yLWQztptywK&x!cceOM6t#(W@-&W*}
+z5Mp>96|--!8Fo8C-h=lscLE>v2@d=0pX#Z5;ZIvnsxyzPGY`)^bPucE{ufWn(?6g2
+z?c^`t{(AcU%#)h;xaR$S?vJkqHE&Q`JS;B_3QOkHR*);%2B&Bss|?a5i17xdX5w+v
+zPgwcRI1le4(sq(&K+Q2Mo6t@WM6w+OdNK$)IbGo(0MeqJk)KAjamQQ)(_=;v(7_r?
+yL(%T1+cL_#@#pXnCdgs+ArAlAob$if+%tCeIXnNd#Ch$dYxCNxDVr~Iv;IG7NE37b
+
+literal 0
+HcmV?d00001
+

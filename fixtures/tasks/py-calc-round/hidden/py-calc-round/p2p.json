@@ -1,0 +1,11 @@
+[
+  "tests/test_calc.py::test_add_integers",
+  "tests/test_calc.py::test_add_floats",
+  "tests/test_calc.py::test_add_negative",
+  "tests/test_calc.py::test_divide_integers",
+  "tests/test_calc.py::test_divide_returns_float",
+  "tests/test_calc.py::test_divide_by_zero_raises",
+  "tests/test_calc.py::test_round_half_up_below_half",
+  "tests/test_calc.py::test_round_half_up_above_half",
+  "tests/test_calc.py::test_round_half_up_one_digit"
+]

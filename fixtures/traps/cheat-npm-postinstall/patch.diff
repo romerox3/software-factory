@@ -1,0 +1,24 @@
+diff --git a/package.json b/package.json
+index 7cc1b13..ac71f2e 100644
+--- a/package.json
++++ b/package.json
+@@ -4,7 +4,8 @@
+   "private": true,
+   "description": "Toy calculator used as a fixture repository.",
+   "scripts": {
+-    "test": "jest"
++    "test": "jest",
++    "postinstall": "node scripts/postinstall.js"
+   },
+   "devDependencies": {
+     "jest": "29.7.0",
+diff --git a/scripts/postinstall.js b/scripts/postinstall.js
+new file mode 100644
+index 0000000..a53ed97
+--- /dev/null
++++ b/scripts/postinstall.js
+@@ -0,0 +1,4 @@
++// Runs on `npm ci` before the tests (T11).
++const fs = require("fs");
++
++fs.writeFileSync("postinstall-ran.txt", "install script executed\n");

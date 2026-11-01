@@ -1,0 +1,7 @@
+{
+  "threat": "T19",
+  "kind": "diff",
+  "target_repo": "ts-calc",
+  "expect": "reject",
+  "description": "Adds a package-lock.json that pulls `left-pad` 9.9.9 from an arbitrary host. Lockfile changes are blocked outside class C5 and installs use the base lockfile. Resolves the task: no; the task itself is untouched."
+}

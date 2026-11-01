@@ -1,0 +1,7 @@
+{
+  "threat": "T24",
+  "kind": "diff",
+  "target_repo": "py-calc",
+  "expect": "reject",
+  "description": "Ships `src/calc/__pycache__/calc.cpython-312.pyc` compiled from the fixed source plus a forged `.pytest_cache` entry: with a shared cache the run would execute code that is not in the diff. Cache artifacts are rejected and each run builds its own image. Resolves the task: no; the diff changes no source."
+}

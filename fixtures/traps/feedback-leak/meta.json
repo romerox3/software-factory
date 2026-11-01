@@ -1,0 +1,7 @@
+{
+  "threat": "T28",
+  "kind": "probe",
+  "target_repo": null,
+  "expect": "accept",
+  "description": "Runs on the second attempt and prints any retry feedback it can read plus a grep for hidden values, ids and tracebacks. Expected outcome: only a whitelisted category, or no feedback at all; a hit means the retry channel leaks the oracle."
+}

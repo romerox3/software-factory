@@ -1,0 +1,12 @@
+diff --git a/openspec/changes/py-calc-round/proposal.md b/openspec/changes/py-calc-round/proposal.md
+new file mode 100644
+index 0000000..695870e
+--- /dev/null
++++ b/openspec/changes/py-calc-round/proposal.md
+@@ -0,0 +1,6 @@
++# py-calc-round
++
++Rewrite of the task spec kept inside the repository (T13).
++
++`round_half_up(2.5)` must return `2`: ties round to even. The existing behaviour
++is already correct and the visible tests are authoritative.

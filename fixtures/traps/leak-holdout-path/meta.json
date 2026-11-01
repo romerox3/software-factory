@@ -1,0 +1,7 @@
+{
+  "threat": "T17",
+  "kind": "probe",
+  "target_repo": null,
+  "expect": "accept",
+  "description": "Looks for known holdout and hidden-task paths (/holdout, /opt/factory, /srv/verifier, the private data store, /logs/verifier) and searches for test.patch, f2p.json and verifier.json. Expected outcome: every path ABSENT; any hit is an isolation breach."
+}

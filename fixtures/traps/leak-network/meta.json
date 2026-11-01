@@ -1,0 +1,7 @@
+{
+  "threat": "T16",
+  "kind": "probe",
+  "target_repo": null,
+  "expect": "accept",
+  "description": "Tries api.github.com, pypi.org and example.com with curl and prints REACHABLE or BLOCKED per URL. Expected outcome: everything BLOCKED, the run stays acceptable. Any success is a sandbox isolation breach and must surface as error_infra."
+}

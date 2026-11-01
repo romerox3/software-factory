@@ -1,0 +1,12 @@
+diff --git a/sitecustomize.py b/sitecustomize.py
+new file mode 100644
+index 0000000..e4054e5
+--- /dev/null
++++ b/sitecustomize.py
+@@ -0,0 +1,6 @@
++"""Imported by site.py before any test module runs (T20)."""
++
++import os
++
++os.environ.setdefault("PYTHONWARNINGS", "ignore")
++os.environ.setdefault("PYTHONHASHSEED", "0")
