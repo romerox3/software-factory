@@ -14,6 +14,9 @@ from pathlib import Path
 
 from factory.tasks.workdir import DEFAULT_WORKDIR
 
+# SWE-bench-style images keep the checkout here even when ``WorkingDir`` is unset.
+TESTBED_WORKDIR = "/testbed"
+
 
 class ImageError(RuntimeError):
     """Docker could not pull, inspect, extract or remove the image."""
@@ -30,12 +33,46 @@ def remove_image(image: str) -> None:
 
 
 def read_workdir(image: str) -> str:
-    """Return the image's ``WorkingDir``; empty means Docker's root, ``/testbed`` in real tasks."""
+    """Return the image's ``WorkingDir``, probing ``/testbed`` when Docker reports none.
+
+    Real SWE-rebench images often leave ``Config.WorkingDir`` empty, so Docker reports
+    ``/``, while the repository sits at ``/testbed``. Only trust the fallback when the
+    image really holds a checkout there; otherwise keep the old default so extraction
+    fails where it always did.
+    """
     result = _docker(
         ["image", "inspect", "--format", "{{.Config.WorkingDir}}", image],
         f"cannot inspect {image}",
     )
-    return result.stdout.strip() or DEFAULT_WORKDIR
+    workdir = result.stdout.strip()
+    if workdir not in {"", "/"}:
+        return workdir
+    if _has_testbed_checkout(image):
+        return TESTBED_WORKDIR
+    return DEFAULT_WORKDIR
+
+
+def _has_testbed_checkout(image: str) -> bool:
+    """Whether ``/testbed`` holds a git repository inside ``image``."""
+    try:
+        result = _docker(
+            [
+                "run",
+                "--rm",
+                "--network",
+                "none",
+                "--entrypoint",
+                "sh",
+                image,
+                "-c",
+                f"test -d {TESTBED_WORKDIR}/.git",
+            ],
+            f"cannot probe {TESTBED_WORKDIR} in {image}",
+            check=False,
+        )
+    except ImageError:
+        return False
+    return result.returncode == 0
 
 
 def extract_repo(image: str, dest: Path) -> str:

@@ -10,8 +10,9 @@ from typing import Any
 
 import pytest
 
+import factory.miner.revalidate as revalidate_module
 from factory.miner.revalidate import _derive, revalidate
-from factory.miner.runner import LocalRunner
+from factory.miner.runner import LocalRunner, RunnerError
 from factory.tasks.workdir import DEFAULT_WORKDIR
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -176,6 +177,64 @@ def test_unapplicable_gold_patch_is_rejected(tmp_path: Path) -> None:
     assert result["valid"] is False
     assert result["reason"] == "patch_failed"
     assert result["runs"] == {"base": [], "gold": []}
+
+
+def test_scratch_directories_live_under_the_given_root(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    scratch = tmp_path / "scratch"
+    seen: list[Path] = []
+
+    class RecordingRunner:
+        def __init__(self) -> None:
+            self.inner = LocalRunner()
+
+        def run(self, repo_dir, test_command, junit_path, timeout_sec, *, workdir=DEFAULT_WORKDIR):
+            seen.append(Path(repo_dir))
+            return self.inner.run(repo_dir, test_command, junit_path, timeout_sec)
+
+    result = revalidate(store, TASK_ID, PY_CALC, RecordingRunner(), seed=1, tmp_root=scratch)
+
+    assert result["valid"] is True
+    assert {path.resolve().parent.parent for path in seen} == {scratch.resolve()}
+    assert list(scratch.resolve().iterdir()) == []
+
+
+def test_a_failed_copy_leaves_no_scratch_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    scratch = tmp_path / "scratch"
+
+    def broken_copy(source: Path, dest: Path, **_kwargs: object) -> None:
+        Path(dest).mkdir(parents=True)
+        (Path(dest) / "half").write_bytes(b"x" * 1024)
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(revalidate_module.shutil, "copytree", broken_copy)
+
+    with pytest.raises(OSError, match="No space left"):
+        revalidate(store, TASK_ID, PY_CALC, LocalRunner(), seed=1, tmp_root=scratch)
+
+    assert list(scratch.resolve().iterdir()) == []
+
+
+def test_runner_error_is_recorded_with_a_truncated_detail(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    message = "docker died: " + "x" * 5000
+
+    class FailingRunner:
+        def run(self, *_args: object, **_kwargs: object) -> dict[str, Any]:
+            raise RunnerError(message)
+
+    result = revalidate(store, TASK_ID, PY_CALC, FailingRunner(), seed=1)
+
+    assert result["valid"] is False
+    assert result["reason"] == "runner_error"
+    assert result["detail"] == message[:2000]
+    assert read_json(store / "hidden" / TASK_ID / "revalidation.json")["detail"] == result["detail"]
 
 
 def test_spec_leak_is_rejected(tmp_path: Path) -> None:

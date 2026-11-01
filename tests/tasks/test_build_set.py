@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from factory.tasks import build_set
 from factory.tasks.build_set import BuildDeps
+from factory.tasks.image import ImageError
 from factory.tasks.import_hf import load_rows
 from factory.tasks.registry import RegistryError
 
@@ -21,12 +25,19 @@ REVISION = "f" * 40
 
 
 class FakeBuild:
-    def __init__(self, tmp_path: Path, *, digest_error: bool = False) -> None:
+    def __init__(
+        self,
+        tmp_path: Path,
+        *,
+        digest_error: bool = False,
+        outcome: dict[str, Any] | None = None,
+    ) -> None:
         self.download_dir = tmp_path / "download"
         self.download_dir.mkdir(parents=True)
         row = dict(load_rows(REBENCH)[0])
         (self.download_dir / "2026_03.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
         self.digest_error = digest_error
+        self.outcome = outcome or {"valid": True, "reason": "ok", "f2p": [], "p2p": []}
         self.calls: list[tuple[Any, ...]] = []
 
     def download(self, dataset: str, revision: str, split: str, dest: Path) -> Path:
@@ -54,6 +65,10 @@ class FakeBuild:
     def remove(self, image: str) -> None:
         self.calls.append(("remove", image))
 
+    def runner(self, image: str, *, tmp_root: Path | None = None) -> object:
+        self.calls.append(("runner", image, tmp_root))
+        return object()
+
     def revalidate(
         self,
         store: Path,
@@ -63,12 +78,12 @@ class FakeBuild:
         *,
         repetitions: int,
         seed: int,
+        tmp_root: Path | None = None,
     ) -> dict[str, Any]:
-        self.calls.append(("revalidate", task_id, base_repo, repetitions))
-        outcome = {"valid": True, "reason": "ok", "f2p": [], "p2p": []}
+        self.calls.append(("revalidate", task_id, base_repo, repetitions, tmp_root))
         path = store / "hidden" / task_id / "revalidation.json"
-        path.write_text(json.dumps(outcome), encoding="utf-8")
-        return outcome
+        path.write_text(json.dumps(self.outcome), encoding="utf-8")
+        return self.outcome
 
     def deps(self) -> BuildDeps:
         return BuildDeps(
@@ -78,7 +93,7 @@ class FakeBuild:
             extract=self.extract,
             checkout=self.checkout,
             remove=self.remove,
-            runner=lambda image: object(),
+            runner=self.runner,
             revalidate=self.revalidate,
         )
 
@@ -113,7 +128,16 @@ def test_one_candidate_runs_the_whole_recipe_and_drops_the_image(tmp_path: Path)
     assert build_set.main(arguments(tmp_path), deps=fake.deps()) == 0
 
     kinds = [call[0] for call in fake.calls]
-    assert kinds == ["download", "digest", "pull", "extract", "checkout", "revalidate", "remove"]
+    assert kinds == [
+        "download",
+        "digest",
+        "pull",
+        "extract",
+        "checkout",
+        "runner",
+        "revalidate",
+        "remove",
+    ]
     task = json.loads((tmp_path / "store" / "visible" / TASK_ID / "factory.task.json").read_text())
     assert task["repo"]["workdir"] == "/testbed"
     assert task["image"] == f"ghcr.io/acme/widgets-1001@{DIGEST}"
@@ -138,6 +162,41 @@ def test_keep_images_leaves_the_image_in_place(tmp_path: Path) -> None:
     build_set.main(arguments(tmp_path, "--keep-images"), deps=fake.deps())
 
     assert "remove" not in [call[0] for call in fake.calls]
+
+
+def test_scratch_directories_are_under_the_work_directory(tmp_path: Path) -> None:
+    fake = FakeBuild(tmp_path)
+
+    build_set.main(arguments(tmp_path), deps=fake.deps())
+
+    expected = tmp_path / "work" / "tmp"
+    assert next(call for call in fake.calls if call[0] == "runner")[2] == expected
+    assert next(call for call in fake.calls if call[0] == "revalidate")[4] == expected
+
+
+def test_a_driver_failure_prints_only_the_first_200_chars(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = FakeBuild(tmp_path)
+    message = "cannot pull image: " + "x" * 500
+
+    def failing_pull(image: str) -> None:
+        raise ImageError(message)
+
+    assert build_set.main(arguments(tmp_path), deps=replace(fake.deps(), pull=failing_pull)) == 0
+
+    assert capsys.readouterr().err.strip() == f"{TASK_ID}: failed: {message[:200]}"
+
+
+def test_a_runner_error_prints_the_first_200_chars_of_the_detail(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    detail = "docker died: " + "x" * 5000
+    fake = FakeBuild(tmp_path, outcome={"valid": False, "reason": "runner_error", "detail": detail})
+
+    build_set.main(arguments(tmp_path), deps=fake.deps())
+
+    assert capsys.readouterr().out.splitlines()[0] == f"{TASK_ID}: runner_error: {detail[:200]}"
 
 
 def test_an_already_revalidated_task_is_skipped(tmp_path: Path) -> None:

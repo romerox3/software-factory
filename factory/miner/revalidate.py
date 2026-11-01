@@ -19,7 +19,7 @@ from typing import Any
 
 from factory.junit import Status
 from factory.miner.leak import detect_leak
-from factory.miner.runner import RunnerError, TestRunner, remove_tree
+from factory.miner.runner import RunnerError, TestRunner, remove_tree, scratch_dir
 from factory.snapshot.fresh_init import build_snapshot
 from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
@@ -41,8 +41,13 @@ def revalidate(
     *,
     repetitions: int = 3,
     seed: int,
+    tmp_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Validate ``task_id`` against ``base_repo`` and record the outcome."""
+    """Validate ``task_id`` against ``base_repo`` and record the outcome.
+
+    ``tmp_root`` pins the repository copies to a caller-owned volume; without it they
+    go to the system temporary directory as before.
+    """
     if repetitions < 1:
         raise ValueError(f"repetitions must be positive: {repetitions}")
     store = Path(store)
@@ -70,7 +75,7 @@ def revalidate(
         "runs": runs,
     }
 
-    tmp = Path(tempfile.mkdtemp(prefix="factory-revalidate-"))
+    tmp = scratch_dir(tmp_root, "factory-revalidate-")
     try:
         base_work = tmp / "base"
         gold_work = tmp / "gold"
@@ -94,8 +99,9 @@ def revalidate(
                 runs["gold"].append(
                     runner.run(gold_work, test_command, junit_path, timeout_sec, workdir=workdir)
                 )
-        except RunnerError:
+        except RunnerError as exc:
             result["reason"] = "runner_error"
+            result["detail"] = str(exc)[:2000]
             _write_json(hidden / "revalidation.json", result)
             return result
     finally:
@@ -121,7 +127,7 @@ def revalidate(
         _write_json(hidden / "f2p.json", f2p)
         _write_json(hidden / "p2p.json", p2p)
         _write_json(hidden / "known_failures.json", known_failures)
-        _write_snapshot(base_repo, visible / "snapshot")
+        _write_snapshot(base_repo, visible / "snapshot", tmp_root=tmp_root)
         rng = random.Random(f"{seed}:{task_id}")
         if rng.random() < 0.3:
             result["repro_test_id"] = rng.choice(f2p)
@@ -199,9 +205,9 @@ def _apply_patch(work: Path, patch: Path) -> None:
         raise PatchError(f"{patch.name} does not apply: {stderr}")
 
 
-def _write_snapshot(base_repo: Path, dest: Path) -> None:
+def _write_snapshot(base_repo: Path, dest: Path, *, tmp_root: Path | None = None) -> None:
     """Create ``dest`` as a single-commit fresh-init snapshot of ``base_repo``."""
-    with tempfile.TemporaryDirectory(prefix="factory-revalidate-source-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="factory-revalidate-source-", dir=tmp_root) as tmp:
         source = Path(tmp) / "source"
         _copy_repo(base_repo, source)
         _commit_base(source)

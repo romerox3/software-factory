@@ -182,6 +182,37 @@ def test_docker_runner_logs_a_failed_fixup(
     assert "chown: Operation not permitted" in caplog.text
 
 
+def test_docker_runner_keeps_its_scratch_dir_under_the_given_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repo(tmp_path).resolve()
+    scratch = tmp_path / "scratch"
+    captured: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured.append(command)
+        if "chown" in command:
+            return subprocess.CompletedProcess(command, 0)
+        logs = _mounts(command)["/logs/verifier"]
+        (logs / "junit.xml").write_text(REPORT, encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_run)
+
+    statuses = DockerRunner("python:3.12-slim", tmp_root=scratch).run(
+        repo,
+        PYTEST.replace("junit.xml", "/logs/verifier/junit.xml"),
+        "/logs/verifier/junit.xml",
+        60,
+    )
+
+    assert statuses == {"tests/test_ok.py::test_ok": "passed"}
+    logs = _mounts(captured[0])["/logs/verifier"]
+    assert logs.parent == scratch.resolve()
+    assert logs.name.startswith("factory-junit-")
+    assert list(scratch.iterdir()) == []
+
+
 def test_remove_tree_raises_when_the_cleanup_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -79,8 +79,9 @@ class LocalRunner:
 class DockerRunner:
     """Run the test command in a network-less container with the repo mounted."""
 
-    def __init__(self, image: str) -> None:
+    def __init__(self, image: str, *, tmp_root: Path | None = None) -> None:
         self.image = image
+        self.tmp_root = tmp_root
 
     def run(
         self,
@@ -93,7 +94,7 @@ class DockerRunner:
     ) -> dict[str, Status]:
         repo_dir = Path(repo_dir).resolve()
         report = _resolve_report(repo_dir, junit_path)
-        tmp = Path(tempfile.mkdtemp(prefix="factory-junit-"))
+        tmp = scratch_dir(self.tmp_root, "factory-junit-")
         logs_dir = tmp if _under_logs(junit_path) else None
         try:
             if logs_dir is not None:
@@ -175,6 +176,20 @@ def docker_fixup_command(
         command += ["-v", f"{Path(logs_dir).resolve()}:{LOGS_MOUNT}"]
         targets.append(LOGS_MOUNT)
     return [*command, image, "chown", "-R", owner, *targets]
+
+
+def scratch_dir(root: Path | None, prefix: str) -> Path:
+    """Create a temporary directory, under ``root`` when the caller pins one.
+
+    A run copies whole repositories, so the build driver pins a directory on its own
+    volume instead of the system temporary filesystem. Library callers keep passing
+    ``None`` and get the usual location.
+    """
+    if root is None:
+        return Path(tempfile.mkdtemp(prefix=prefix))
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=root))
 
 
 def remove_tree(path: Path) -> None:

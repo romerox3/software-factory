@@ -49,7 +49,7 @@ class BuildDeps:
     extract: Callable[[str, Path], str] = extract_repo
     checkout: Callable[[Path, str], None] = checkout
     remove: Callable[[str], None] = remove_image
-    runner: Callable[[str], TestRunner] = DockerRunner
+    runner: Callable[..., TestRunner] = DockerRunner
     revalidate: Callable[..., dict[str, Any]] = revalidate
 
 
@@ -88,6 +88,7 @@ def main(argv: Sequence[str] | None = None, *, deps: BuildDeps | None = None) ->
 
 def _build_one(candidate: Candidate, args: argparse.Namespace, deps: BuildDeps) -> None:
     repo = args.work / "repos" / candidate.task_id
+    tmp_root = args.work / "tmp"
     try:
         deps.pull(candidate.image)
         if repo.exists():
@@ -106,13 +107,16 @@ def _build_one(candidate: Candidate, args: argparse.Namespace, deps: BuildDeps) 
             args.store,
             task.task_id,
             repo,
-            deps.runner(candidate.image),
+            deps.runner(candidate.image, tmp_root=tmp_root),
             repetitions=REPETITIONS,
             seed=args.seed,
+            tmp_root=tmp_root,
         )
-        print(f"{task.task_id}: {result['reason']}")
+        detail = result.get("detail")
+        suffix = f": {detail[:200]}" if detail else ""
+        print(f"{task.task_id}: {result['reason']}{suffix}")
     except (ImageError, RunnerError, OSError) as exc:
-        print(f"{candidate.task_id}: failed: {exc}", file=sys.stderr)
+        print(f"{candidate.task_id}: failed: {str(exc)[:200]}", file=sys.stderr)
     finally:
         if not args.keep_images:
             deps.remove(candidate.image)
