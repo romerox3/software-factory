@@ -23,7 +23,7 @@ Se elige la 2.
 2. **Aplicación en el gateway**:
    - cada `data_class` es un equipo de LiteLLM con su lista de modelos permitidos;
    - la virtual key de cada run se crea en el equipo de su clase y no puede llamar a otros modelos [Cierto: una key con `team_id` hereda las restricciones del equipo].
-   - Matriz en [02](../02-architecture.md) §8. Para `client-product`, solo la 5090, z.ai y Anthropic. **OpenAI y los proveedores gratuitos quedan fuera hasta que el propietario los autorice.** Que la cuenta de z.ai sea de API de pago por token y no un plan de suscripción está sin confirmar ([09](../09-open-questions.md) S14).
+   - Matriz en [02](../02-architecture.md) §8. Para `client-product`: la 5090, z.ai, Anthropic, NaN y OpenRouter (D1, decidido por el propietario el 2026-11-01). **OpenAI queda fuera.** En OpenRouter, nada de modelos `:free` y las peticiones van con `provider.data_collection: deny`, porque las rutas gratuitas pueden registrar prompts [Probable]. Las cuentas de z.ai y de Anthropic son planes de suscripción, aceptados por el propietario (S14).
 3. **Separación física**:
    - tareas, tests ocultos, holdouts, trayectorias, veredictos y la configuración del piloto viven en el **almacén privado** (`factory-pilot-data`), hermano de este repo y sin remoto público;
    - en este repo solo hay esquemas, código genérico, fixtures propios e informes agregados sin contenido del piloto.
@@ -35,9 +35,9 @@ Se elige la 2.
 
 ## Consecuencias
 
-- En F0 todas las tareas son `public`, así que D1 no bloquea nada. El brazo opcional A2′ (Codex × OpenAI) se puede ejecutar sin autorización, pero los brazos base usan solo los proveedores permitidos para el piloto, para que los resultados se trasladen a F1. Desde F1, el brazo «Codex con modelo de OpenAI» no existe para tareas del piloto salvo que D1 lo autorice.
+- En F0 todas las tareas son `public`. Los brazos usan solo proveedores permitidos para el piloto, para que los resultados se trasladen a F1. A2′ (Codex × OpenAI) queda descartado: OpenAI no está autorizado para el piloto (D1).
 - Hasta F1 no hace falta mirror del piloto en Hetzner ni confirmar S3 y S4.
-- El juez de otro vendor que ve código del piloto es un modelo local o de Anthropic, nunca un proveedor gratuito.
+- El juez de otro vendor que ve código del piloto es un modelo local, de Anthropic o de NaN. Nunca un modelo `:free` de OpenRouter.
 - Los informes publicables usan identificadores de tarea opacos.
 
 ## Cómo revertir

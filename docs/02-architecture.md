@@ -44,10 +44,11 @@ flowchart TB
     VER --> VERD
   end
   subgraph EXT["Proveedores"]
-    ANT["Anthropic API"]
-    ZAI["z.ai (GLM)"]
+    ANT["Anthropic (suscripción)"]
+    ZAI["z.ai (GLM, coding plan)"]
   end
   SB1 & SB2 -- "solo HTTP al gateway" --> LL
+  SB1 -. "solo A1, variante (c): HTTPS directo" .-> ANT
   LL --> VLLM
   LL --> ANT & ZAI
   VER -- "pull de artefactos (solo lectura)" --> ART
@@ -164,7 +165,7 @@ Detalle en el [ADR-0009](adr/0009-data-policy-per-repo.md). Se aplica en el gate
 |---|---|---|---|---|---|
 | `public` (repo fixture, la factory) | sí | sí | sí | sí | sí |
 | `internal` | sí | sí | sí | sí | según los términos de retención |
-| `client-product` (piloto) | sí | sí | sí | **no, salvo autorización** | **no** |
+| `client-product` (piloto) | sí | sí | sí | **no** (D1) | **NaN y OpenRouter sí** (D1, 2026-11-01). En OpenRouter, sin modelos `:free` y con `data_collection: deny`; el resto, no |
 | `client-restricted` | sí | no | sí | no | no |
 
 ## Decisiones abiertas

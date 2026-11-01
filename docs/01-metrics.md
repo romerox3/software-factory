@@ -17,7 +17,7 @@
 - **Fórmula**: `M1 = Σ coste(las k = 3 primeras ejecuciones del brazo en cada tarea) / nº de tareas con al menos una de esas ejecuciones aceptada`. Para comparar brazos se usa siempre el mismo k ([06](06-harness-and-tasks.md) §5). Se publican dos variantes:
   - `M1.gen`: solo generación.
   - `M1.total`: generación + verificación (juez, critic, mutation en CI medida en minutos de CPU convertidos a USD con una tarifa fija declarada).
-- **Coste** = `coste_real_usd + coste_sombra_usd`. El real sale del gasto de la virtual key en LiteLLM. El sombra es el precio de lista por token configurado para los modelos gratuitos, de tarifa plana o locales ([ADR-0004](adr/0004-gateway.md)). Sin el coste sombra, los brazos gratuitos tendrían M1 = 0 y la métrica dejaría de comparar algo.
+- **Coste** = `coste_real_usd + coste_sombra_usd`. El real sale del gasto de la virtual key en LiteLLM. **En F0 ningún brazo tiene coste real**: A1 usa la suscripción de Anthropic y los brazos de GLM el coding plan de z.ai (decisión del 2026-11-01), así que M1 es solo sombra. El coste real vuelve a contar en cuanto un brazo use una API de pago. El sombra es el precio de lista por token configurado para los modelos gratuitos, de tarifa plana o locales ([ADR-0004](adr/0004-gateway.md)). Sin el coste sombra, los brazos gratuitos tendrían M1 = 0 y la métrica dejaría de comparar algo.
 - **Por qué esta y no coste por token**: un brazo barato que falla y se reintenta puede salir más caro por cambio aceptado ([Jain](https://martinfowler.com/articles/are-harnesses-worth-the-cost.html)) [Cierto, n=10].
 - **Baseline**: el brazo Claude Code × Sonnet en F0.
 - **Objetivo (hipótesis)**: en F2, al menos un brazo o variante tiene `M1.total` ≤ 50 % de su comparador con M2 no inferior (margen Δ = 10 puntos, §3). Esta es la única regla de coste: la usan [07](07-roadmap.md) F2 y [ADR-0010](adr/0010-escalation-on-verified-failure.md).
@@ -116,7 +116,7 @@ Consecuencias:
 
 - **Las repeticiones valen tanto como las tareas.** El ruido de una sola ejecución es alto: con k = 1, ni 30 tareas detectan bien 25 puntos.
 - **F0**: 30 tareas, **k = 3 en los brazos de pago** y **k = 5 en los brazos con modelos locales o de cuota**. Así F0 detecta diferencias de ~17 puntos con una potencia de 0,76–0,93. Diferencias menores **no se afirman**: se reportan como «sin diferencia detectable».
-- **Coste de F0 del brazo de pago** (Claude Code × Sonnet): 30 × 3 = 90 ejecuciones. A 1–3 USD por ejecución [Suposición] son 90–270 USD, por debajo de la alarma de 300 USD.
+- **Coste de F0 de A1** (Claude Code × Sonnet): 30 × 3 = 90 ejecuciones con la suscripción del propietario. A 1–3 USD por ejecución [Suposición] son 90–270 USD de coste sombra, que no se pagan pero gastan cuota del plan ([06](06-harness-and-tasks.md) §5).
 - **F2** necesita ≥ 50 tareas para comparar variantes del harness con diferencias de ~13 puntos.
 
 ### No-inferioridad

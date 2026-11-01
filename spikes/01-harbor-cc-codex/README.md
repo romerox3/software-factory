@@ -35,22 +35,23 @@ Cuando no se cumplen, `validate_network_policy_support` lanza un error y la tare
 ## 4. Parte B pendiente: qué hace falta y qué se medirá
 
 **Necesito del propietario** (el spike no las lee de configuraciones existentes):
-1. Una API key de Anthropic **de pago** (no de suscripción), dada de alta como modelo en el gateway.
+1. Un token de la suscripción de Anthropic (`claude setup-token`). El propietario no tiene API de pago y acepta la suscripción (2026-11-01). B1 prueba primero que el gateway lo guarde o lo reenvíe y, si no funciona, la salida directa ([04](../../docs/04-executor-contract.md) §5.1).
 2. Una clave de z.ai (GLM) dada de alta en el gateway, con `use_chat_completions_api: true` para el puente Responses.
-3. Una clave de LiteLLM con permiso para crear virtual keys en un equipo `factory-public`.
+3. Una clave de LiteLLM con permiso para crear virtual keys en un equipo `factory-public`. El orquestador tiene acceso al gateway desde el 2026-11-01.
 
 **Criterios** (cada uno cierra un punto concreto del diseño):
 
 | # | Prueba | Cierra |
 |---|---|---|
-| B1 | `harbor run -a claude-code -m <alias>` con `ANTHROPIC_BASE_URL=<gateway>` y una virtual key con `max_budget = 0.50` resuelve `calc-rounding` | Tesis 4: Claude Code a través del gateway con API key |
+| B1 | `harbor run -a claude-code -m <alias>` resuelve `calc-rounding` con la suscripción, probando las variantes (a), (b) y (c) de [04](../../docs/04-executor-contract.md) §5.1 por ese orden. En (a) y (b), con `ANTHROPIC_BASE_URL=<gateway>` y una virtual key con `max_budget = 0.50` | Qué variante usa A1 |
 | B2 | El `total_cost_usd` de Claude Code frente al gasto de la virtual key: discrepancia < 5 % | M1 (conciliación) |
 | B3 | `harbor run -a codex` con un proveedor `factory_gateway` y `wire_api = "responses"` contra GLM resuelve la tarea y sus tool calls funcionan | El brazo A2 de F0 ([06](../../docs/06-harness-and-tasks.md)) |
 | B4 | Una virtual key con `max_budget = 0.01` corta la ejecución, y el adaptador lo mapea a `budget_exceeded` | Presupuesto por ejecución |
 | B5 | Un modelo con precio sombra 0 frente a > 0 en `model_info`: ¿se corta el presupuesto? | Advertencia de [02](../../docs/02-architecture.md) §7 |
 | B6 | En la torre Linux: `network-probe` con `no-network` → reward 1 (todo inalcanzable salvo lo permitido) | Red del sandbox |
+| B7 | Porcentaje de ventana por ejecución en los dos planes: `percentage` de `TOKENS_LIMIT` de z.ai antes y después de B3 (no `model-usage`, que no registra el coding plan), y el uso de la suscripción de Anthropic antes y después de B1 | S18: cuota de la matriz |
 
-Coste estimado de la parte B: < 2 USD de Anthropic + la cuota de z.ai [Suposición].
+Coste estimado de la parte B: sin gasto real; unos pocos puntos de la ventana de cada plan [Suposición].
 
 ## 5. Cómo reproducir la parte A
 

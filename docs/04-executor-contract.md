@@ -34,7 +34,7 @@
 | `tokens` | El gateway; la trayectoria solo si el gateway no tiene el campo | `source` dice de dónde salió |
 | `cost` | El gateway: `usd_real` + `usd_shadow` | `agent_reported_usd` (por ejemplo, el `total_cost_usd` de Claude Code) solo sirve para conciliar. Una discrepancia > 5 % marca la ejecución |
 | `abort` | El adaptador lee `abort.json` | Obligatorio si `exit = abort_spec_conflict` (lo exige el schema) |
-| `provenance` | El harness | Versión del CLI, modelo resuelto por el gateway, hashes del prompt, la configuración y la tarea, y digest de la imagen. Reimplementa la idea de la procedencia de `agent.sh` de orca-role-hook ([03](03-reuse-inventory.md)) |
+| `provenance` | El harness | Versión del CLI, modelo resuelto por el gateway (en A1 sin gateway, el id completo que fija `--model`), hashes del prompt, la configuración y la tarea, y digest de la imagen. Reimplementa la idea de la procedencia de `agent.sh` de orca-role-hook ([03](03-reuse-inventory.md)) |
 
 Hay ejemplos de entrada y salida para cada adaptador en [`examples/executor/`](../examples/executor), validados con `check-jsonschema` (§7).
 
@@ -52,7 +52,7 @@ Todos los adaptadores envuelven la tarea con la misma plantilla (`base-v1`), par
 
 ## 5. Adaptadores
 
-Los cuatro corren dentro del contenedor de la tarea. La red solo llega al gateway (§6 de [02](02-architecture.md)). `HOME` está vacío, sin configuración del usuario ni credenciales de suscripción.
+Los cuatro corren dentro del contenedor de la tarea. La red solo llega al gateway (§6 de [02](02-architecture.md)). `HOME` está vacío, sin configuración del usuario. La única credencial es la virtual key, salvo en la variante (c) de A1 (§5.1).
 
 ### 5.1 Claude Code (baseline)
 
@@ -67,7 +67,11 @@ Los cuatro corren dentro del contenedor de la tarea. La red solo llega al gatewa
   ```
   Todos estos flags están en la [CLI reference](https://code.claude.com/docs/en/cli-reference) [Cierto]. `--max-budget-usd` se comprueba contra la estimación del cliente, no contra la facturación [Cierto]: es un segundo fusible, y el que manda es el del gateway. `stream-json` exige `--verbose` [Cierto]. Los permisos se omiten porque **el aislamiento lo da el contenedor**, no el CLI.
 - **Entorno**:
-  - `ANTHROPIC_BASE_URL=<gateway>` y `ANTHROPIC_API_KEY=<virtual key>`: **nunca OAuth ni suscripción** (tesis 4).
+  - **Credencial: la suscripción del propietario** (decisión del 2026-11-01, que sustituye a «nunca OAuth ni suscripción»). El spike B1 prueba tres variantes por orden de preferencia:
+    - (a) el gateway guarda el token OAuth (`claude setup-token`) y el sandbox solo recibe `ANTHROPIC_BASE_URL=<gateway>` y la virtual key;
+    - (b) el sandbox lleva el token y el gateway lo reenvía, contando el gasto en la virtual key;
+    - (c) si ninguna de las dos funciona, el sandbox de A1 sale directamente a `api.anthropic.com` con `CLAUDE_CODE_OAUTH_TOKEN`. Es la única excepción a la salida única de red ([02](02-architecture.md) §2) y la única con una credencial que no caduca con la ejecución. Lleva `--disallowedTools WebSearch,WebFetch`, para que el agente no busque el fix publicado; `--model` con el id completo (regla 6); el fusible en `--max-budget-usd` y `--max-turns`; el coste en el `total_cost_usd` del CLI como coste sombra; y el token borrado de las trayectorias antes de guardarlas.
+  - Anthropic limita el token OAuth de los planes a Claude Code y claude.ai [Probable]. Aquí corre el CLI oficial, así que (c) encaja [Suposición], pero (a) y (b) pasan por un proxy y son zona gris [Suposición] (R7).
   - `DISABLE_AUTOUPDATER=1` y `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` [Cierto, [env-vars](https://code.claude.com/docs/en/env-vars)].
   - `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT=<collector>` y `OTEL_RESOURCE_ATTRIBUTES=run.id=<run_id>,task.id=<task>` [Cierto, [monitoring](https://code.claude.com/docs/en/monitoring-usage)].
 - **Sin `--bare`**. `--bare` se salta CLAUDE.md, hooks, MCP y skills [Cierto]. En un contenedor con `HOME` vacío no hay nada del usuario que saltar, y el CLAUDE.md del repo forma parte de la tarea.
@@ -191,6 +195,6 @@ El 2026-10-31 validaron los 3 schemas contra el metaschema, los 8 ficheros de ej
 
 ## Decisiones abiertas
 
-- **Tool calls de Codex a través del puente Responses→chat de LiteLLM con GLM**. Plan B único, el mismo en [ADR-0001](adr/0001-harness-runner.md), [06](06-harness-and-tasks.md) y [08](08-risks.md): si falla B3 del spike, el brazo A2 se sustituye por **OpenHands SDK × GLM**, que mantiene el modelo fijo para comparar ejecutores. Si además se autoriza OpenAI (D1, [09](09-open-questions.md)), se añade A2′ Codex × OpenAI.
+- **Tool calls de Codex a través del puente Responses→chat de LiteLLM con GLM**. Plan B único, el mismo en [ADR-0001](adr/0001-harness-runner.md), [06](06-harness-and-tasks.md) y [08](08-risks.md): si falla B3 del spike, el brazo A2 se sustituye por **OpenHands SDK × GLM**, que mantiene el modelo fijo para comparar ejecutores. No hay A2′ (Codex × OpenAI): OpenAI no está autorizado (D1, [09](09-open-questions.md)).
 - Si la normalización debe mapear a OTel GenAI semconv además del esquema propio. Las semconv no tienen estado de estabilidad declarado [Cierto, informe capa 8], y se pospone a F2.
 - `tokens` en `budget` solo lo aplican los CLIs que tienen un flag para ello. Queda por decidir si el harness corta por tokens leyendo el gasto del gateway en vivo.

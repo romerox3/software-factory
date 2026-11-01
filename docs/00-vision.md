@@ -48,7 +48,7 @@ Cada umbral tiene fórmula, fuente y tamaño de muestra en [01-metrics](01-metri
 1. Construir lo que mide; reutilizar lo que ejecuta.
 2. El evaluador está aislado del generador por construcción: otras credenciales, otra máquina, holdouts ilegibles y checkout limpio que solo recibe el diff.
 3. Pipeline determinista.
-4. Agnóstico de agente y de modelo; Claude Code es la baseline con API key a través del gateway y la versión fijada. Nunca con suscripción en ejecuciones automáticas.
+4. Agnóstico de agente y de modelo; Claude Code es la baseline, con la versión fijada. Usa la suscripción del propietario y pasa por el gateway si este puede reenviar el OAuth ([04](04-executor-contract.md) §5.1). La versión original de esta tesis («API key y nunca suscripción») la cambió el propietario el 2026-11-01: solo tiene suscripción de Anthropic y acepta planes en las ejecuciones automáticas.
 5. La autonomía se gana por clase de tarea, con datos.
 6. La factory es su propio primer cliente.
 7. Minimalismo verificable: cada componente cita la métrica que mueve o la restricción que cumple ([02](02-architecture.md), tabla de justificación).
