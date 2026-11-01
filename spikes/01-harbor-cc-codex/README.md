@@ -53,6 +53,14 @@ Cuando no se cumplen, `validate_network_policy_support` lanza un error y la tare
 
 Coste estimado de la parte B: sin gasto real; unos pocos puntos de la ventana de cada plan [Suposición].
 
+### Resultados parciales de la parte B (2026-11-01, contra el gateway real)
+
+| # | Resultado | Consecuencia |
+|---|---|---|
+| B4 | Una key con `max_budget = 1e-05` acepta la primera llamada y rechaza las siguientes con **HTTP 429** y `error.type = "budget_exceeded"` [Cierto]. El corte llega una petición tarde: la llamada que cruza el límite se sirve (gasto 1,01e-05 frente a 1e-05) | El adaptador mapea `budget_exceeded` por `error.type`, no por el código, porque un 429 también puede ser un límite de ritmo. El presupuesto de la key es un fusible con un exceso de hasta una petición |
+| B5 | Ningún modelo de los equipos de la factory tiene precio 0. Los que lo tienen en el gateway (los `:free` de OpenRouter y los de audio o imagen de NaN) quedan fuera de los equipos [Cierto] | El problema de que «un coste 0 se salta el presupuesto» se evita por construcción. El smoke de F0-03 comprueba que ningún modelo de un equipo de la factory tiene precio 0 |
+| B1, B2, B3, B6, B7 | Pendientes: B1 y B2 necesitan el token de la suscripción, que tiene que generar el propietario en su PC; B3 y B7, Codex y Harbor contra el gateway; B6, la torre (F0-07) | — |
+
 ## 5. Cómo reproducir la parte A
 
 ```bash
