@@ -75,9 +75,14 @@ def _id_list(path: Path) -> tuple[str, ...]:
     return tuple(document)
 
 
-def _read_tree(root: Path) -> dict[str, bytes]:
+SNAPSHOT_DIR = "snapshot"
+
+
+def _read_tree(root: Path, skip: tuple[str, ...] = ()) -> dict[str, bytes]:
     files: dict[str, bytes] = {}
     for path in sorted(root.rglob("*")):
+        if path.relative_to(root).parts[0] in skip:
+            continue
         if path.is_symlink():
             raise TaskError(f"symlink in the task store: {path}")
         if path.is_file():
@@ -116,7 +121,7 @@ def load_task(store: Path, task_id: str) -> Task:
     if not test_patch.strip():
         raise TaskError("test.patch is empty")
 
-    tree = _read_tree(visible_dir)
+    tree = _read_tree(visible_dir, skip=(SNAPSHOT_DIR,))
     spec_paths = frozenset(path for path in tree if path != "factory.task.json")
     overlay = {
         path: data

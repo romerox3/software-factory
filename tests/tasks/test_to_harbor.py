@@ -206,6 +206,19 @@ def test_real_workdir_checks_out_the_base_and_replaces_the_history(tmp_path: Pat
     assert (generated / "environment" / "snapshot.git" / "HEAD").is_file()
 
 
+def test_snapshot_contents_are_exempt_from_the_hidden_material_scan(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    add_snapshot(task_dir)
+    snapshot = task_dir / "snapshot"
+    (snapshot / "test.patch").write_text("a repo file named like ours\n", encoding="utf-8")
+    (snapshot / "hidden").mkdir()
+    (snapshot / "link").symlink_to(snapshot / ".git" / "HEAD")
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    assert (generated / "environment" / "snapshot.git" / "HEAD").is_file()
+
+
 def test_real_workdir_without_snapshot_is_rejected(tmp_path: Path) -> None:
     task_dir = copy_visible_task(tmp_path)
     write_task_config(task_dir, repo={**TASK["repo"], "workdir": "/testbed"})

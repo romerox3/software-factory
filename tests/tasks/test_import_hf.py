@@ -13,6 +13,7 @@ import pytest
 from factory.tasks.import_hf import (
     download_split,
     load_rows,
+    load_split,
     select,
     update_manifest,
     write_task,
@@ -341,3 +342,42 @@ def test_load_rows_rejects_unknown_formats(tmp_path: Path) -> None:
 def test_download_split_requires_a_full_sha(tmp_path: Path, revision: str) -> None:
     with pytest.raises(ValueError):
         download_split("acme/data", revision, "2026_03", tmp_path / "download")
+
+
+def test_download_split_requests_the_data_dir_shards(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[dict] = []
+
+    def fake_snapshot_download(**kwargs: object) -> None:
+        calls.append(dict(kwargs))
+
+    monkeypatch.setattr("factory.tasks.import_hf.snapshot_download", fake_snapshot_download)
+
+    dest = download_split(REBENCH_DATASET, REVISION, "2026_03", tmp_path / "download")
+
+    assert dest == tmp_path / "download"
+    assert len(calls) == 1
+    assert calls[0]["repo_id"] == REBENCH_DATASET
+    assert calls[0]["revision"] == REVISION
+    patterns = calls[0]["allow_patterns"]
+    assert "data/2026_03-*.parquet" in patterns
+    assert "**/2026_03/**" in patterns
+
+
+def test_load_split_reads_the_data_dir_shard_layout(tmp_path: Path) -> None:
+    data = tmp_path / "download" / "data"
+    data.mkdir(parents=True)
+    shards = {
+        "2026_02-00000-of-00001.parquet": ["previous-split"],
+        "2026_03-00001-of-00002.parquet": ["second-shard"],
+        "2026_03-00000-of-00002.parquet": ["first-shard"],
+        "2026_030-00000-of-00001.parquet": ["prefix-lookalike"],
+    }
+    for name, instance_ids in shards.items():
+        table = pa.Table.from_pylist([{"instance_id": value} for value in instance_ids])
+        pq.write_table(table, data / name)
+
+    rows = load_split(tmp_path / "download", "2026_03")
+
+    assert [row["instance_id"] for row in rows] == ["first-shard", "second-shard"]

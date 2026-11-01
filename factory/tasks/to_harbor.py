@@ -86,6 +86,10 @@ def _assert_no_hidden_material(task_dir: Path) -> None:
     if task_dir.is_symlink():
         raise ValueError(f"task directory is a symlink: {task_dir}")
     for path in task_dir.rglob("*"):
+        if path.relative_to(task_dir).parts[0] == SNAPSHOT_NAME:
+            # The snapshot is the repository at the base commit: its files are not
+            # task material, and the verifier builds its own checkout anyway.
+            continue
         if path.is_symlink():
             raise ValueError(f"task directory contains a symlink: {path}")
         if path.is_dir() and path.name == HIDDEN_DIR_NAME:

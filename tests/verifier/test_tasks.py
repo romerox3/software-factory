@@ -138,6 +138,19 @@ def test_feedback_never_names_hidden_material(round_store, py_mirror, sandbox) -
         assert verdict.attempt == attempt
 
 
+def test_a_snapshot_in_the_visible_task_is_not_part_of_the_overlay(tmp_path: Path) -> None:
+    store = copy_store(ROUND, tmp_path / "store")
+    git = store / "visible" / ROUND / "snapshot" / ".git"
+    (git / "objects").mkdir(parents=True)
+    for index in range(300):
+        (git / "objects" / f"{index:04d}").write_text("x" * 64, encoding="utf-8")
+
+    task = load_task(store, ROUND)
+
+    assert task.overlay == {}
+    assert task.spec_paths == frozenset({"openspec/changes/py-calc-round/proposal.md"})
+
+
 def test_the_canary_mark_comes_from_the_hidden_verifier_document_only() -> None:
     assert load_task(TASKS / CANARY, CANARY).canary is True
     assert load_task(TASKS / ROUND, ROUND).canary is False

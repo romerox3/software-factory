@@ -110,18 +110,26 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
 def load_split(download: Path, split: str) -> list[dict[str, Any]]:
     """Read every ``.parquet``/``.jsonl`` file that belongs to ``split``.
 
-    Hugging Face stores a split either as a directory (``ts/...``) or as a file
-    named after it (``2026_03.parquet``), so both the path parts and the stem are
-    checked.
+    Hugging Face stores a split as a directory (``ts/...``), as a file named
+    after it (``2026_03.parquet``) or as shards under ``data/``
+    (``2026_03-00000-of-00001.parquet``), so the path parts, the exact stem and
+    the ``{split}-`` prefix are checked. Shards are concatenated in name order.
     """
     download = Path(download)
-    files = [
-        path
-        for path in sorted(download.rglob("*"))
-        if path.is_file()
-        and path.suffix.lower() in {".parquet", ".jsonl"}
-        and (split in path.relative_to(download).parts or split in path.stem)
-    ]
+    files = sorted(
+        (
+            path
+            for path in download.rglob("*")
+            if path.is_file()
+            and path.suffix.lower() in {".parquet", ".jsonl"}
+            and (
+                split in path.relative_to(download).parts
+                or path.stem == split
+                or path.stem.startswith(f"{split}-")
+            )
+        ),
+        key=lambda path: path.name,
+    )
     if not files:
         raise FileNotFoundError(f"no dataset file for split {split!r} under {download}")
     rows: list[dict[str, Any]] = []
@@ -144,7 +152,14 @@ def download_split(dataset: str, revision: str, split: str, dest: Path) -> Path:
         repo_type="dataset",
         revision=revision,
         local_dir=str(dest),
-        allow_patterns=[f"**/{split}/**", f"{split}/**"],
+        allow_patterns=[
+            f"data/{split}-*.parquet",
+            f"data/{split}-*.jsonl",
+            f"{split}.parquet",
+            f"{split}.jsonl",
+            f"**/{split}/**",
+            f"{split}/**",
+        ],
     )
     return dest
 
