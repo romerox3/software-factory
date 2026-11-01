@@ -23,7 +23,7 @@ Se elige la 2.
 2. **Aplicación en el gateway**:
    - cada `data_class` es un equipo de LiteLLM con su lista de modelos permitidos;
    - la virtual key de cada run se crea en el equipo de su clase y no puede llamar a otros modelos [Cierto: una key con `team_id` hereda las restricciones del equipo].
-   - Matriz en [02](../02-architecture.md) §8. Para `client-product`: la 5090, z.ai, Anthropic, NaN y OpenRouter (D1, decidido por el propietario el 2026-11-01). **OpenAI queda fuera.** En OpenRouter, nada de modelos `:free` y las peticiones van con `provider.data_collection: deny`, porque las rutas gratuitas pueden registrar prompts [Probable]. Las cuentas de z.ai y de Anthropic son planes de suscripción, aceptados por el propietario (S14).
+   - Matriz en [02](../02-architecture.md) §8. Para `client-product`: la 5090, z.ai, Anthropic, NaN y OpenRouter (D1, decidido por el propietario el 2026-11-01 y extendido a su política general para ese código). **OpenAI queda fuera.** En OpenRouter, nada de modelos `:free` y las peticiones van con `provider.data_collection: deny`, porque las rutas gratuitas pueden registrar prompts [Probable]. Las cuentas de z.ai y de Anthropic son planes de suscripción, aceptados por el propietario (S14).
 3. **Separación física**:
    - tareas, tests ocultos, holdouts, trayectorias, veredictos y la configuración del piloto viven en el **almacén privado** (`factory-pilot-data`), hermano de este repo y sin remoto público;
    - en este repo solo hay esquemas, código genérico, fixtures propios e informes agregados sin contenido del piloto.
