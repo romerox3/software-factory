@@ -34,6 +34,7 @@ Software factory con agentes de IA: un pipeline determinista que convierte tarea
 8. **Etiquetas de confianza en `docs/`**: toda afirmación factual, cifra o generalización lleva [Cierto] (fuente primaria enlazada), [Probable] o [Suposición]. Las recomendaciones no llevan etiqueta. Ni el código ni los commits llevan etiquetas.
 9. Documentación en español; código, identificadores y mensajes de commit en inglés.
 10. **Lo pendiente se pregunta con el formulario de Claude Code** (`AskUserQuestion`), nunca en prosa al final de un mensaje. Vale para dudas, decisiones, preguntas y supuestos por confirmar. La recomendación va primero, marcada «(Recomendado)», y cada pregunta tiene que entenderse sin el texto anterior. Los peones y subagentes no abren formularios: devuelven la duda al orquestador y la pregunta él. Una vez respondida, la decisión se registra en el documento que corresponda (09, un ADR o el roadmap).
+11. **Página de estado para el propietario.** El orquestador mantiene un artefacto privado de claude.ai que explica lo hecho y lo pendiente, con el porqué y el para qué de cada punto, las decisiones y los riesgos abiertos. Se actualiza al cerrar cada tarea del backlog, al tomar una decisión o al abrir o cerrar un riesgo. El slug y la fuente HTML viven en `../factory-pilot-data/estado/` (README), no en este repo.
 
 ## Quién implementa
 
