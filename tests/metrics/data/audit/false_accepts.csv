@@ -1,0 +1,13 @@
+run_id,verdict,auditor_verdict,note
+bad-accept-1,accept,incorrect,does not fix the issue
+bad-accept-2,accept,incorrect,does not fix the issue
+reject-1,reject,correct,correctly rejected
+reject-2,reject,correct,correctly rejected
+reject-3,reject,correct,correctly rejected
+reject-4,reject,correct,correctly rejected
+reject-5,reject,correct,correctly rejected
+reject-6,reject,correct,correctly rejected
+reject-7,reject,correct,correctly rejected
+reject-8,reject,correct,correctly rejected
+reject-9,reject,correct,correctly rejected
+reject-10,reject,correct,correctly rejected

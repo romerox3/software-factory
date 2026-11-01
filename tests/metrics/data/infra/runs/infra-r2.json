@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1",
+  "run_id": "infra-r2",
+  "exit": "done",
+  "diff": {
+    "uri": "diffs/infra-r2.patch",
+    "sha256": "sha256:9a87ce6001915787e22a2b57dc7e92c1da5fbf7225b2b8839ba031c5d353ed4b",
+    "files_changed": 1,
+    "lines_added": 5,
+    "lines_removed": 5
+  },
+  "cost": {
+    "usd_real": 0.25,
+    "usd_shadow": 0.25,
+    "source": "gateway"
+  }
+}

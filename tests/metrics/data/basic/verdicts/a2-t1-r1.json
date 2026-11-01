@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "run_id": "a2-t1-r1",
+  "task_id": "t1",
+  "arm": "A2",
+  "attempt": 1,
+  "repetition": 1,
+  "verdict": "accept",
+  "reason": "tests pass",
+  "verify_cost_usd": 0.02,
+  "diff_sha": "sha256:dfbedcb4a4086df6713fbf948ffcbc9fee27223d783e6c8af7588b42a73cbbde"
+}

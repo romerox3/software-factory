@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1",
+  "run_id": "a1-t2-r3",
+  "exit": "done",
+  "diff": {
+    "uri": "diffs/a1-t2-r3.patch",
+    "sha256": "sha256:a6613651cd1e3d940e13a3510b6b3d63aa066906324aa60065910352610adc67",
+    "files_changed": 1,
+    "lines_added": 4,
+    "lines_removed": 4
+  },
+  "cost": {
+    "usd_real": 0.2,
+    "usd_shadow": 0.2,
+    "source": "gateway"
+  }
+}

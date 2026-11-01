@@ -1,0 +1,14 @@
+run_id,verdict,auditor_verdict,note
+accept-1,accept,correct,"checked by hand, matches spec"
+accept-2,accept,correct,"checked by hand, matches spec"
+accept-3,accept,correct,"checked by hand, matches spec"
+reject-1,reject,correct,correctly rejected
+reject-2,reject,correct,correctly rejected
+reject-3,reject,correct,correctly rejected
+reject-4,reject,correct,correctly rejected
+reject-5,reject,correct,correctly rejected
+reject-6,reject,correct,correctly rejected
+reject-7,reject,correct,correctly rejected
+cheat-1,cheat_suspected,correct,diff guard hit
+cheat-2,cheat_suspected,correct,diff guard hit
+cheat-3,cheat_suspected,correct,diff guard hit

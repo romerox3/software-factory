@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "run_id": "infra-r1",
+  "task_id": "t1",
+  "arm": "A1",
+  "attempt": 1,
+  "repetition": 1,
+  "verdict": "accept",
+  "reason": "tests pass",
+  "verify_cost_usd": 0.01,
+  "diff_sha": "sha256:9a87ce6001915787e22a2b57dc7e92c1da5fbf7225b2b8839ba031c5d353ed4b"
+}
