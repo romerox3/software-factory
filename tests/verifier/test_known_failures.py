@@ -41,14 +41,17 @@ def all_passed() -> dict[str, str]:
     return {dotted(test_id): "passed" for test_id in [*F2P, *P2P]}
 
 
-def writes(cases: dict[str, str], *, exit_code: int = 0, **result: object):
+def writes(
+    cases: dict[str, str], *, exit_code: int = 0, sealed_exit: int | None = None, **result: object
+):
     """A run that writes the JUnit report and the matching sealed result stream."""
+    exit_status = exit_code if sealed_exit is None else sealed_exit
 
     def behavior(request: RunRequest) -> RunResult:
         report_path(request).write_text(junit_xml(cases), encoding="utf-8")
         return RunResult(
             exit_code=exit_code,
-            stdout=stream_bytes(cases, exit_status=exit_code),
+            stdout=stream_bytes(cases, exit_status=exit_status),
             **result,  # type: ignore[arg-type]
         )
 
@@ -91,6 +94,36 @@ def test_a_known_failure_failing_with_exit_code_1_is_an_accept(py_mirror, tmp_pa
     assert verdict.verdict == "accept", verdict.reason
     assert verdict.diagnostics["known_failures"] == 1
     assert verdict.diagnostics["known_failures_in_report"] == 1
+
+
+def test_exit_code_2_rejects_even_with_known_failures(py_mirror, tmp_path) -> None:
+    cases = {**all_passed(), dotted(KNOWN): "failed"}
+    store = store_with_known(tmp_path, [KNOWN])
+
+    verdict = check(FakeSandbox(writes(cases, exit_code=2)), py_mirror, store)
+
+    assert verdict.verdict == "reject"
+    assert verdict.category == "hidden_checks_failed"
+
+
+def test_a_sealed_exit_status_2_rejects_with_a_container_exit_of_1(py_mirror, tmp_path) -> None:
+    cases = {**all_passed(), dotted(KNOWN): "failed"}
+    store = store_with_known(tmp_path, [KNOWN])
+
+    verdict = check(FakeSandbox(writes(cases, exit_code=1, sealed_exit=2)), py_mirror, store)
+
+    assert verdict.verdict == "reject"
+    assert verdict.category == "hidden_checks_failed"
+
+
+def test_a_killed_container_rejects_even_with_known_failures(py_mirror, tmp_path) -> None:
+    cases = {**all_passed(), dotted(KNOWN): "failed"}
+    store = store_with_known(tmp_path, [KNOWN])
+
+    verdict = check(FakeSandbox(writes(cases, exit_code=137)), py_mirror, store)
+
+    assert verdict.verdict == "reject"
+    assert verdict.category == "hidden_checks_failed"
 
 
 def test_a_known_failure_that_now_passes_is_not_a_reject(py_mirror, tmp_path) -> None:

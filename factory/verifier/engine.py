@@ -545,10 +545,10 @@ def _judge_hidden(state: _State, task: Task, outcome: _Outcome) -> Verdict:
             "known_failures": len(known),
             "known_failures_in_report": sum(1 for i in known if i in statuses),
         }
-        # With recorded pre-existing failures the suite cannot end green, so the two exit
-        # checks are not required; the sealed stream was still parsed and had to be complete
-        # and clean (see _execute and _run_problems). An empty list keeps the old rule.
-        exits_ok = bool(known) or (exit_code == 0 and _exit_status_ok(task, outcome))
+        # With recorded pre-existing failures the suite cannot end green, so pytest may
+        # report its "tests failed" status (1); anything else (interrupted, internal error,
+        # usage error, crash) is still a reject. An empty list keeps the old rule.
+        exits_ok = _exits_ok(task, outcome)
         green = (
             f2p_pass == len(task.f2p)
             and p2p_pass == len(task.p2p)
@@ -584,6 +584,17 @@ def _judge_hidden(state: _State, task: Task, outcome: _Outcome) -> Verdict:
             "evaluation_error",
             feedback=hidden,
         )
+
+
+def _exits_ok(task: Task, outcome: _Outcome) -> bool:
+    """Exit codes consistent with a suite that only failed on the known failures."""
+    if not task.known_failures:
+        return outcome.result.exit_code == 0 and _exit_status_ok(task, outcome)
+    if outcome.result.exit_code not in (0, 1):
+        return False
+    if task.framework == "pytest":
+        return outcome.exit_status in (0, 1)
+    return _exit_status_ok(task, outcome)
 
 
 def _exit_status_ok(task: Task, outcome: _Outcome) -> bool:
