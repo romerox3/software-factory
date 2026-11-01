@@ -1,0 +1,19 @@
+{
+  "schema_version": "1",
+  "task_id": "py-calc-flaky",
+  "class": "C1",
+  "data_class": "public",
+  "repo": {
+    "commit": "0000000000000000000000000000000000000000"
+  },
+  "image": "python@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "visible_tests": {
+    "command": "python -m pytest -q tests/test_calc.py",
+    "ids": []
+  },
+  "budget": {
+    "usd": 1.0,
+    "max_turns": 20,
+    "timeout_sec": 300
+  }
+}

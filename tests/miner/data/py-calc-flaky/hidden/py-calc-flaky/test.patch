@@ -1,0 +1,22 @@
+diff --git a/tests/test_calc.py b/tests/test_calc.py
+index d76a230..aa6c5b0 100644
+--- a/tests/test_calc.py
++++ b/tests/test_calc.py
+@@ -39,3 +39,17 @@ def test_round_half_up_above_half() -> None:
+ 
+ def test_round_half_up_one_digit() -> None:
+     assert round_half_up(1.24, 1) == 1.2
++
++
++def test_round_half_up_rounds_ties_up() -> None:
++    assert round_half_up(2.5) == 3
++
++
++def test_alternates_between_runs() -> None:
++    import os
++    from pathlib import Path
++
++    counter = Path(os.environ["FLAKY_COUNTER"])
++    count = int(counter.read_text(encoding="utf-8")) if counter.exists() else 0
++    counter.write_text(str(count + 1), encoding="utf-8")
++    assert count % 2 == 0

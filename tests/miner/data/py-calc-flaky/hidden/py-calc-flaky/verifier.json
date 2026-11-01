@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "task_id": "py-calc-flaky",
+  "test_command": "python -m pytest -q --junitxml=junit.xml -p no:cacheprovider",
+  "framework": "pytest",
+  "junit_path": "junit.xml",
+  "timeout_sec": 120,
+  "diff_guard": {
+    "forbidden_globs": [
+      "tests/**"
+    ]
+  },
+  "mutation": {
+    "enabled": false
+  }
+}
