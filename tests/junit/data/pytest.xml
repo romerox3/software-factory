@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="tests/test_calc.py" tests="4" failures="1" errors="1" skipped="1" time="0.021">
+    <testcase classname="tests.test_calc.TestRound" name="test_half[2.5]" time="0.001" />
+    <testcase classname="tests.test_calc.TestRound" name="test_half[2.4]" time="0.001">
+      <failure message="assert 2.0 == 2">tests/test_calc.py:12: AssertionError</failure>
+    </testcase>
+    <testcase classname="tests.test_calc.TestRound" name="test_half[bad]" time="0.002">
+      <error message="ValueError: could not convert string to float">tests/test_calc.py:8: ValueError</error>
+    </testcase>
+    <testcase classname="tests.test_calc.TestRound" name="test_half[0]" time="0.000">
+      <skipped type="pytest.mark.skip" message="not implemented yet" />
+    </testcase>
+    <system-out>4 passed, 1 failed, 1 error, 1 skipped</system-out>
+    <system-err>warning: division by zero</system-err>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="vitest tests" tests="2" failures="1" errors="0" time="0.5">
+  <testsuite name="src/calc.test.ts" tests="2" failures="1" errors="0" time="0.5">
+    <testcase classname="src/calc.test.ts" name="calc &gt; rounds half up" time="0.001" />
+    <testcase classname="src/calc.test.ts" name="calc &gt; rejects invalid input" time="0.002">
+      <failure message="expected 1 to be 0">AssertionError: expected 1 to be 0
+    at src/calc.test.ts:8:5</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

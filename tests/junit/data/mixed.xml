@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuite name="calc" tests="4" failures="1" errors="1" skipped="1">
+  <testcase classname="calc.Round" name="test_error_wins" time="0.001">
+    <failure message="first attempt" />
+    <error message="boom" />
+  </testcase>
+  <testcase classname="calc.Round" name="test_failure_beats_skipped" time="0.001">
+    <skipped />
+    <failure message="boom" />
+  </testcase>
+  <testcase classname="calc.Round" name="test_only_skipped" time="0.001">
+    <skipped message="not implemented yet" />
+  </testcase>
+  <testcase classname="calc.Round" name="test_noise_only" time="0.001">
+    <rerunFailure message="first attempt failed" />
+    <flakyFailure message="first attempt flaked" />
+    <system-out>stdout from the test</system-out>
+    <system-err>stderr from the test</system-err>
+  </testcase>
+</testsuite>
