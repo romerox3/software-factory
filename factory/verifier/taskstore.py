@@ -38,6 +38,7 @@ class Task:
     forbidden_globs: tuple[str, ...]
     f2p: tuple[str, ...]
     p2p: tuple[str, ...]
+    known_failures: tuple[str, ...]
     test_patch: bytes
     verifier_bytes: bytes
     overlay: dict[str, bytes]
@@ -110,6 +111,8 @@ def load_task(store: Path, task_id: str) -> Task:
 
     f2p = _id_list(hidden_dir / "f2p.json")
     p2p = _id_list(hidden_dir / "p2p.json")
+    known_path = hidden_dir / "known_failures.json"
+    known_failures = _id_list(known_path) if known_path.is_file() else ()
     if not f2p:
         raise TaskError("f2p.json is empty")
     if set(f2p) & set(p2p):
@@ -142,6 +145,7 @@ def load_task(store: Path, task_id: str) -> Task:
         forbidden_globs=tuple(verifier["diff_guard"]["forbidden_globs"]),
         f2p=f2p,
         p2p=p2p,
+        known_failures=known_failures,
         test_patch=test_patch,
         verifier_bytes=verifier_bytes,
         overlay=overlay,

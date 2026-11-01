@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from factory.miner.revalidate import revalidate
+from factory.miner.revalidate import _derive, revalidate
 from factory.miner.runner import LocalRunner
 from factory.tasks.workdir import DEFAULT_WORKDIR
 
@@ -32,6 +32,15 @@ PASSING_TEST_PATCH = """diff --git a/tests/test_calc.py b/tests/test_calc.py
 +
 +def test_add_zero() -> None:
 +    assert add(0, 0) == 0
+"""
+
+ALWAYS_FAILING_TEST_PATCH = """diff --git a/tests/test_known_broken.py b/tests/test_known_broken.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_known_broken.py
+@@ -0,0 +1,2 @@
++def test_always_fails() -> None:
++    assert False
 """
 
 BROKEN_GOLD_PATCH = """diff --git a/src/calc/__init__.py b/src/calc/__init__.py
@@ -94,7 +103,40 @@ def test_round_fixture_revalidates_as_valid(tmp_path: Path) -> None:
     assert result["flaky"] == []
     assert read_json(store / "hidden" / TASK_ID / "f2p.json") == result["f2p"]
     assert read_json(store / "hidden" / TASK_ID / "p2p.json") == result["p2p"]
+    assert result["known_failures"] == []
+    assert read_json(store / "hidden" / TASK_ID / "known_failures.json") == []
     assert read_json(store / "hidden" / TASK_ID / "revalidation.json") == result
+
+
+def test_a_test_broken_in_every_run_is_a_known_failure(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    patch = store / "hidden" / TASK_ID / "test.patch"
+    patch.write_text(
+        patch.read_text(encoding="utf-8") + ALWAYS_FAILING_TEST_PATCH, encoding="utf-8"
+    )
+
+    result = revalidate(store, TASK_ID, PY_CALC, LocalRunner(), seed=1)
+
+    assert result["valid"] is True
+    assert result["known_failures"] == ["tests/test_known_broken.py::test_always_fails"]
+    assert read_json(store / "hidden" / TASK_ID / "known_failures.json") == result["known_failures"]
+
+
+def test_a_failure_that_only_appears_in_some_runs_is_not_a_known_failure() -> None:
+    runs: dict[str, list[dict[str, Any]]] = {
+        "base": [{"tests::test_a": "failed"} for _ in range(3)],
+        "gold": [
+            {"tests::test_a": "failed"},
+            {"tests::test_a": "passed"},
+            {"tests::test_a": "failed"},
+        ],
+    }
+
+    _, _, flaky, known_failures = _derive(runs)
+
+    assert flaky == ["tests::test_a"]
+    assert known_failures == []
 
 
 def test_flaky_task_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

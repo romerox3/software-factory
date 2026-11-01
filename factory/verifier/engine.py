@@ -526,32 +526,39 @@ def _judge_hidden(state: _State, task: Task, outcome: _Outcome) -> Verdict:
         assert outcome.statuses is not None
         statuses = outcome.statuses
         expected = (*task.f2p, *task.p2p)
+        known = frozenset(task.known_failures)
         f2p_pass = sum(statuses.get(i) == "passed" for i in task.f2p)
         p2p_pass = sum(statuses.get(i) == "passed" for i in task.p2p)
         missing = [i for i in expected if i not in statuses]
         unexpected_failures = [
             i
             for i, status in statuses.items()
-            if i not in expected and status in ("failed", "error")
+            if i not in expected and i not in known and status in ("failed", "error")
         ]
         exit_code = outcome.result.exit_code
         state.hard["f2p"] = {"pass": f2p_pass, "fail": len(task.f2p) - f2p_pass}
         state.hard["p2p"] = {"pass": p2p_pass, "fail": len(task.p2p) - p2p_pass}
         state.hard["missing_ids"] = len(missing)
-        diagnostics = {"exit_code": exit_code, "duration_s": round(outcome.result.duration_s, 3)}
+        diagnostics = {
+            "exit_code": exit_code,
+            "duration_s": round(outcome.result.duration_s, 3),
+            "known_failures": len(known),
+            "known_failures_in_report": sum(1 for i in known if i in statuses),
+        }
+        # With recorded pre-existing failures the suite cannot end green, so the two exit
+        # checks are not required; the sealed stream was still parsed and had to be complete
+        # and clean (see _execute and _run_problems). An empty list keeps the old rule.
+        exits_ok = bool(known) or (exit_code == 0 and _exit_status_ok(task, outcome))
         green = (
             f2p_pass == len(task.f2p)
             and p2p_pass == len(task.p2p)
             and not unexpected_failures
-            and exit_code == 0
-            and _exit_status_ok(task, outcome)
+            and exits_ok
         )
         if green:
             return state.verdict(ACCEPT, "all hard checks passed", diagnostics=diagnostics)
         items: list[dict[str, Any]] = []
-        hidden_failed = bool(
-            missing or unexpected_failures or exit_code != 0 or not _exit_status_ok(task, outcome)
-        )
+        hidden_failed = bool(missing or unexpected_failures or not exits_ok)
         for test_id in expected:
             status = statuses.get(test_id)
             if status == "passed":

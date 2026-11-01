@@ -25,6 +25,8 @@ from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
 _MISSING = "missing"
 _FAILING_STATES = frozenset({"failed", "error", _MISSING})
+# A test that fails in every base and gold run is a pre-existing failure, not a regression.
+_BROKEN_STATES = frozenset({"failed", "error"})
 
 
 class PatchError(RuntimeError):
@@ -99,10 +101,11 @@ def revalidate(
     finally:
         remove_tree(tmp)
 
-    f2p, p2p, flaky = _derive(runs)
+    f2p, p2p, flaky, known_failures = _derive(runs)
     result["f2p"] = f2p
     result["p2p"] = p2p
     result["flaky"] = flaky
+    result["known_failures"] = known_failures
 
     if not f2p:
         result["reason"] = "no_f2p"
@@ -117,6 +120,7 @@ def revalidate(
     else:
         _write_json(hidden / "f2p.json", f2p)
         _write_json(hidden / "p2p.json", p2p)
+        _write_json(hidden / "known_failures.json", known_failures)
         _write_snapshot(base_repo, visible / "snapshot")
         rng = random.Random(f"{seed}:{task_id}")
         if rng.random() < 0.3:
@@ -139,8 +143,12 @@ def _workdir(task_path: Path) -> str:
 
 def _derive(
     runs: dict[str, list[dict[str, Status]]],
-) -> tuple[list[str], list[str], list[str]]:
-    """Return ``(f2p, p2p, flaky)`` from the per-run status maps."""
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    """Return ``(f2p, p2p, flaky, known_failures)`` from the per-run status maps.
+
+    Known failures are the tests that fail in every base run and every gold run: they are
+    pre-existing breakage of the suite, so the verifier cannot require a green exit for it.
+    """
     base_runs = runs["base"]
     gold_runs = runs["gold"]
     test_ids = sorted({test_id for run in [*base_runs, *gold_runs] for test_id in run})
@@ -148,6 +156,7 @@ def _derive(
     f2p: list[str] = []
     p2p: list[str] = []
     flaky: list[str] = []
+    known_failures: list[str] = []
     for test_id in test_ids:
         base_states = [run.get(test_id, _MISSING) for run in base_runs]
         gold_states = [run.get(test_id, _MISSING) for run in gold_runs]
@@ -159,7 +168,11 @@ def _derive(
             f2p.append(test_id)
         if all(state == "passed" for state in [*base_states, *gold_states]):
             p2p.append(test_id)
-    return f2p, p2p, flaky
+        if test_id not in flaky and all(
+            state in _BROKEN_STATES for state in [*base_states, *gold_states]
+        ):
+            known_failures.append(test_id)
+    return f2p, p2p, flaky, known_failures
 
 
 def _copy_repo(source: Path, dest: Path) -> None:
