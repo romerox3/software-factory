@@ -8,6 +8,8 @@ node ids (``tests/test_calc.py::test_x``) so they match F2P/P2P lists.
 
 from __future__ import annotations
 
+import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -19,6 +21,8 @@ from factory.tasks.workdir import DEFAULT_WORKDIR
 from factory.testids import pytest_node_id
 
 LOGS_MOUNT = "/logs/verifier"
+
+_log = logging.getLogger(__name__)
 
 
 class RunnerError(RuntimeError):
@@ -89,10 +93,10 @@ class DockerRunner:
     ) -> dict[str, Status]:
         repo_dir = Path(repo_dir).resolve()
         report = _resolve_report(repo_dir, junit_path)
-        with tempfile.TemporaryDirectory(prefix="factory-junit-") as tmp:
-            logs_dir = None
-            if _under_logs(junit_path):
-                logs_dir = Path(tmp)
+        tmp = Path(tempfile.mkdtemp(prefix="factory-junit-"))
+        logs_dir = tmp if _under_logs(junit_path) else None
+        try:
+            if logs_dir is not None:
                 report = logs_dir / PurePosixPath(junit_path).name
             _remove_stale_report(report)
             command = docker_command(
@@ -111,6 +115,12 @@ class DockerRunner:
             except OSError as exc:
                 raise RunnerError(f"could not run docker: {exc}") from exc
             return _read_report(report, repo_dir)
+        finally:
+            # The container runs as root, so it may have left root-owned files in
+            # the bind mounts (``__pycache__``, build outputs). Hand them back to
+            # the host user before the directories are removed or reused.
+            _restore_ownership(self.image, repo_dir, workdir=workdir, logs_dir=logs_dir)
+            remove_tree(tmp)
 
 
 def docker_command(
@@ -133,15 +143,68 @@ def docker_command(
         f"{repo_dir}:{workdir}",
         "-w",
         workdir,
+        "-e",
+        "PYTHONDONTWRITEBYTECODE=1",
     ]
     if logs_dir is not None:
         command += ["-v", f"{Path(logs_dir).resolve()}:{LOGS_MOUNT}"]
     return [*command, image, "bash", "-c", test_command]
 
 
+def docker_fixup_command(
+    image: str,
+    repo_dir: Path,
+    *,
+    workdir: str = DEFAULT_WORKDIR,
+    logs_dir: Path | None = None,
+) -> list[str]:
+    """Build the container that hands the mounts back to the host user."""
+    repo_dir = Path(repo_dir).resolve()
+    owner = f"{os.getuid()}:{os.getgid()}"
+    command = [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "-v",
+        f"{repo_dir}:{workdir}",
+    ]
+    targets = [workdir]
+    if logs_dir is not None:
+        command += ["-v", f"{Path(logs_dir).resolve()}:{LOGS_MOUNT}"]
+        targets.append(LOGS_MOUNT)
+    return [*command, image, "chown", "-R", owner, *targets]
+
+
+def remove_tree(path: Path) -> None:
+    """Delete a run directory, reporting the removal the fix-up could not enable."""
+    try:
+        shutil.rmtree(path)
+    except OSError as exc:
+        _log.error("could not remove the run directory %s: %s", path, exc)
+        raise RunnerError(f"could not remove the run directory {path}: {exc}") from exc
+
+
 def docker_available() -> bool:
     """Whether a usable ``docker`` binary is on ``PATH``."""
     return shutil.which("docker") is not None
+
+
+def _restore_ownership(image: str, repo_dir: Path, *, workdir: str, logs_dir: Path | None) -> None:
+    command = docker_fixup_command(image, repo_dir, workdir=workdir, logs_dir=logs_dir)
+    try:
+        result = subprocess.run(command, check=False, capture_output=True, text=True)
+    except OSError as exc:
+        _log.warning("could not restore ownership of %s: %s", repo_dir, exc)
+        return
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip().splitlines()
+        _log.warning(
+            "could not restore ownership of %s: %s",
+            repo_dir,
+            stderr[-1] if stderr else f"docker exited with {result.returncode}",
+        )
 
 
 def _resolve_report(repo_dir: Path, junit_path: str) -> Path:

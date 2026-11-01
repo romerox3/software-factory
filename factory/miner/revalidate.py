@@ -19,7 +19,7 @@ from typing import Any
 
 from factory.junit import Status
 from factory.miner.leak import detect_leak
-from factory.miner.runner import RunnerError, TestRunner
+from factory.miner.runner import RunnerError, TestRunner, remove_tree
 from factory.snapshot.fresh_init import build_snapshot
 from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
@@ -68,9 +68,10 @@ def revalidate(
         "runs": runs,
     }
 
-    with tempfile.TemporaryDirectory(prefix="factory-revalidate-") as tmp:
-        base_work = Path(tmp) / "base"
-        gold_work = Path(tmp) / "gold"
+    tmp = Path(tempfile.mkdtemp(prefix="factory-revalidate-"))
+    try:
+        base_work = tmp / "base"
+        gold_work = tmp / "gold"
         _copy_repo(base_repo, base_work)
         _copy_repo(base_repo, gold_work)
         try:
@@ -95,6 +96,8 @@ def revalidate(
             result["reason"] = "runner_error"
             _write_json(hidden / "revalidation.json", result)
             return result
+    finally:
+        remove_tree(tmp)
 
     f2p, p2p, flaky = _derive(runs)
     result["f2p"] = f2p
