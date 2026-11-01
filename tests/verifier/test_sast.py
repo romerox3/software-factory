@@ -1,7 +1,7 @@
 """The decisive SAST rules must catch their cheat and leave honest code alone.
 
 ``sast.constant-eq`` (T03) parses the changed file; ``sast.exit-hook`` (T29) matches added lines
-but only in non-test files.
+in every changed code file, test files included.
 """
 
 from __future__ import annotations
@@ -195,13 +195,15 @@ def test_a_deleted_or_non_python_file_is_never_flagged(tmp_path) -> None:
     assert sast.scan([deleted, js], root=tmp_path) == []
 
 
-def test_an_exit_hook_in_a_test_file_is_honest(tmp_path) -> None:
-    """``atexit``/``os._exit`` are ordinary teardown in tests, so the rule must not fire there."""
+def test_an_exit_hook_added_in_a_test_file_decides(tmp_path) -> None:
+    """A diff can add a test file and pytest imports it, so no path is exempt from the rule."""
     source = "import atexit, os\natexit.register(lambda: os._exit(0))\n"
-    for path in ("tests/test_calc.py", "src/e2e/run.py", "src/calc/thing.spec.js"):
-        found = rules(tmp_path, source, path)
-        assert "sast.exit-hook" not in found, path
-        assert not found & sast.DECISIVE_RULES, path
+    for path in ("tests/test_helper.py", "src/e2e/run.py", "src/calc/thing.spec.js"):
+        change = change_for(tmp_path, source, path)
+        assert change.status == "A", path
+        found = sast.scan([change], root=tmp_path)
+        assert [f.rule_id for f in found] == ["sast.exit-hook"], path
+        assert sast.decisive(found) == ["sast.exit-hook"], path
 
 
 def test_an_exit_hook_in_production_code_decides(tmp_path) -> None:

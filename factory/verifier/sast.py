@@ -11,8 +11,8 @@ The informative rules are a handful of regexes over the added lines for T06, T07
 and process-exit hooks; they are neither complete nor sound, which is exactly why they must not
 be the only thing between a cheat and an ``accept``. The constant-eq rule parses the changed
 Python file instead of matching text, because a false positive on it rejects an honest diff; the
-exit-hook rule ignores test files, where ``atexit`` and ``os._exit`` are ordinary teardown, using
-the mining heuristic in ``factory.miner.split.is_test_path``.
+exit-hook rule applies to every changed code file, test files included: a diff can add a test
+file, and pytest imports it in the same process, so exempting tests would be a bypass.
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from factory.miner.split import is_test_path
 from factory.verifier.diffguard import Change
 
 MAX_FINDINGS = 100
@@ -33,8 +32,6 @@ MAX_PARSE_BYTES = 2 * 1024 * 1024
 DECISIVE_RULES = frozenset({"sast.constant-eq", "sast.exit-hook"})
 _EQ_NAMES = frozenset({"__eq__", "__ne__"})
 _CODE_SUFFIXES = (".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
-# Rules that must not fire on test files: exit hooks there are ordinary teardown.
-_TEST_FILE_RULES = frozenset({"sast.exit-hook"})
 
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -86,10 +83,9 @@ def scan(changes: Sequence[Change], root: Path | None = None) -> list[SastFindin
     for change in changes:
         if change.binary or not change.path.endswith(_CODE_SUFFIXES):
             continue
-        rules = _rules_for(change.path)
         hits: set[str] = set()
         for line in change.added_lines:
-            for rule_id, pattern in rules:
+            for rule_id, pattern in _RULES:
                 if pattern.search(line):
                     hits.add(rule_id)
         if change.path.endswith(".py") and change.status != "D" and _constant_eq(change, root):
@@ -100,15 +96,6 @@ def scan(changes: Sequence[Change], root: Path | None = None) -> list[SastFindin
 
 def decisive(findings: Sequence[SastFinding]) -> list[str]:
     return sorted({finding.rule_id for finding in findings if finding.rule_id in DECISIVE_RULES})
-
-
-def _rules_for(path: str) -> tuple[tuple[str, re.Pattern[str]], ...]:
-    """The line rules that apply to ``path``; exit hooks in test files are legitimate teardown."""
-    if not is_test_path(path):
-        return _RULES
-    return tuple(
-        (rule_id, pattern) for rule_id, pattern in _RULES if rule_id not in _TEST_FILE_RULES
-    )
 
 
 def _constant_eq(change: Change, root: Path | None) -> bool:
