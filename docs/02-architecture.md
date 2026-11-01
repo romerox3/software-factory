@@ -1,13 +1,13 @@
 # 02 · Arquitectura
 
-> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, por donde pasan los modelos y el dinero). El gateway y el verificador comparten un servidor Hetzner Cloud: ahí las zonas se separan por credenciales, usuario, contenedor y volumen, no por máquina. Un orquestador determinista mueve artefactos entre ellas, siempre con pull desde Hetzner. Los LLM solo viven en los nodos de ejecución y en las señales blandas. En F0 orquestan Harbor y unos scripts; en F1, un runner DOT mínimo. Cada componente justifica en §7 la métrica que mueve o la restricción que cumple.
+> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, por donde pasan los modelos y el dinero). El gateway y el verificador comparten un servidor Hetzner Cloud: ahí las zonas se separan por credenciales, usuario, contenedor y volumen, no por máquina. Un orquestador determinista mueve artefactos entre ellas, siempre con pull desde Hetzner. Los LLM solo viven en los nodos de ejecución y en las señales blandas. En F0 orquestan Harbor y unos scripts; en F1, un runner mínimo de pipelines YAML. Cada componente justifica en §7 la métrica que mueve o la restricción que cumple.
 
 ## 1. Capas
 
 | # | Capa | Pieza | Reutilizar o construir |
 |---|---|---|---|
 | L1 | Intake de tareas | Carpetas OpenSpec ([ADR-0005](adr/0005-task-format.md)); en F0 las genera el minero, en F1 un issue etiquetado | Formato reutilizado; minero propio ([06](06-harness-and-tasks.md)) |
-| L2 | Orquestación | F0: Harbor + scripts. F1: runner DOT mínimo ([ADR-0002](adr/0002-orchestrator.md)) | Reutilizar en F0; construir fino en F1 |
+| L2 | Orquestación | F0: Harbor + scripts. F1: runner mínimo de pipelines YAML ([ADR-0002](adr/0002-orchestrator.md)) | Reutilizar en F0; construir fino en F1 |
 | L3 | Contrato de ejecutor | Esquemas + adaptadores ([04](04-executor-contract.md)) | Construir (fino sobre los agentes de Harbor) |
 | L4 | Sandbox | Docker con red restringida y snapshot sin historial ([ADR-0003](adr/0003-sandbox.md)) | Reutilizar Docker; construir el snapshot y la red |
 | L5 | Gateway | LiteLLM con virtual keys, equipos por clase de datos y precios sombra ([ADR-0004](adr/0004-gateway.md)) | Reutilizar |
@@ -21,7 +21,7 @@
 ```mermaid
 flowchart TB
   subgraph TORRE["Torre (RTX 5090) — zona GENERADOR"]
-    ORQ["Orquestador F0/F1<br/>(Harbor + scripts / runner DOT)"]
+    ORQ["Orquestador F0/F1<br/>(Harbor + scripts / runner YAML)"]
     SB1["Sandbox Docker<br/>ejecutor + snapshot fresh-init"]
     SB2["Sandbox Docker …"]
     VLLM["vLLM<br/>(modelos locales)"]
@@ -105,7 +105,7 @@ flowchart LR
   HR --> MT[Métricas M3/M4/M7]
 ```
 
-- El grafo es un fichero DOT versionado (`pipelines/issue-to-draft-pr.dot`), con un subconjunto de nodos y atributos compatible con Attractor ([ADR-0002](adr/0002-orchestrator.md)).
+- El grafo es un fichero YAML versionado (`pipelines/issue-to-draft-pr.yaml`) que valida contra `schemas/pipeline.schema.json`. El DOT se genera a partir de él solo para dibujarlo ([ADR-0002](adr/0002-orchestrator.md)).
 - Los reintentos son deterministas, por defecto 2, y solo reciben la **categoría** del rechazo, según la lista blanca de [05](05-verification-design.md) principio 7. Nunca valores, nombres ni trazas de tests ocultos o holdouts (amenaza T28).
 - `needs-human` tras N fallos sigue la regla de [dark-factory-experiment](https://github.com/coleam00/dark-factory-experiment) (referencia de diseño; el repo no tiene licencia) [Cierto en la ausencia de licencia, verificada el 2026-10-31].
 
@@ -151,7 +151,7 @@ flowchart LR
 | Juez de otro vendor (F2) | M3 (desempate en best-of-n) | Best-of-n elegiría al azar entre verdes |
 | Critic 4B (F2, condicional) | Solo entra si se correlaciona con M2 en F2 | No se construye |
 | Cross-check (F2, condicional) | Solo entra si mejora M3 o M4 | No se construye |
-| Runner DOT (F1) | Tesis 3 (determinista) y reproducibilidad del pipeline (grafo versionado + checkpoints). La portabilidad entre motores ya no es un argumento ([ADR-0002](adr/0002-orchestrator.md) §4) | El flujo estaría en código imperativo sin un grafo revisable |
+| Runner de pipelines YAML (F1) | Tesis 3 (determinista) y reproducibilidad del pipeline (grafo versionado + checkpoints). La portabilidad entre motores ya no es un argumento ([ADR-0002](adr/0002-orchestrator.md) §4) | El flujo estaría en código imperativo sin un grafo revisable |
 | Publicador | Safe outputs: el ejecutor no tiene escritura (gh-aw, Eve) | El agente tendría el token de GitHub |
 | NATS JetStream | **No está en F0 ni en F1.** Entra en F2 solo si el fan-out de best-of-n o la cola de issues lo necesitan (métrica: M6 limitado por la cola) | — |
 | Langfuse, Opik o Docent (UI de trazas) | **No está en F0.** Docent como piloto en F1 si el análisis por lotes de trayectorias detecta clusters de trampa que M5 no ve | — |

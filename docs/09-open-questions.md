@@ -40,7 +40,7 @@
   - Tracker marca su parser DOT como deprecado en favor de `.dip`, que no tiene licencia;
   - Kilroy está parado desde abril.
 
-  El plan **mantiene DOT** como formato propio, simple y versionado, pero la razón ya no es la portabilidad entre motores ([ADR-0002](adr/0002-orchestrator.md) §4). **Pregunta**: ¿se mantiene la tesis con la razón cambiada, o se cambia el formato del pipeline (por ejemplo, YAML propio)?
+  **Cerrado el 2026-11-01**: después de investigar las alternativas, el propietario elige un **YAML propio con JSON Schema**. DOT se genera solo para los diagramas, y Serverless Workflow 1.0 queda como destino de traducción ([ADR-0002](adr/0002-orchestrator.md) §4).
 
 ## 4. Correcciones al informe de investigación (verificadas en vivo el 2026-10-31)
 

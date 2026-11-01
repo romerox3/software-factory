@@ -17,7 +17,7 @@ Software factory con agentes de IA: un pipeline determinista que convierte tarea
 | `tasks/*.manifest.json` (F0) | Manifiestos de los conjuntos públicos (dataset de HF, revisión, `instance_id`, digest de imagen). La tarea se regenera a partir de ellos; los tests ocultos nunca están en este repo |
 | `factory/` (F0) | Código Python 3.12 (`uv`): `gateway/`, `snapshot/`, `miner/`, `tasks/`, `adapters/`, `verifier/`, `normalize/`, `metrics/` |
 | `prompts/` (F0) | Prompts versionados de los ejecutores (`base-v1.md`); cambiar uno dispara M8 |
-| `pipelines/` (F1) | Pipelines DOT (subconjunto Attractor, [ADR-0002](docs/adr/0002-orchestrator.md)) |
+| `pipelines/` (F1) | Pipelines en YAML validados con `schemas/pipeline.schema.json`; el DOT se genera solo para los diagramas ([ADR-0002](docs/adr/0002-orchestrator.md)) |
 | `infra/` (F0) | Scripts de la torre (`torre/egress.sh`) y del verificador (`verifier/`, con `isolation-check.sh`), sin hosts: los valores van en el almacén privado |
 | `reports/` (F0) | Informes agregados sin contenido del piloto |
 | `.githooks/pre-commit` | Rechaza contenido que coincida con la denylist privada |

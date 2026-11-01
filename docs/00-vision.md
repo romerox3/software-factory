@@ -52,7 +52,7 @@ Cada umbral tiene fórmula, fuente y tamaño de muestra en [01-metrics](01-metri
 5. La autonomía se gana por clase de tarea, con datos.
 6. La factory es su propio primer cliente.
 7. Minimalismo verificable: cada componente cita la métrica que mueve o la restricción que cumple ([02](02-architecture.md), tabla de justificación).
-8. Formatos antes que plataformas: DOT, OpenSpec, JSONL crudo y OTel en ficheros versionados.
+8. Formatos antes que plataformas: pipelines en YAML con JSON Schema, OpenSpec, JSONL crudo y OTel en ficheros versionados. La versión original decía «DOT compatible con Attractor»; el propietario la cambió el 2026-11-01 ([ADR-0002](adr/0002-orchestrator.md) §4).
 9. **Separación de datos del piloto** (añadido, [ADR-0009](adr/0009-data-policy-per-repo.md)): nada del repo piloto entra en este repositorio. F0 se hace solo con tareas públicas, y el piloto entra en F1. Las tareas, los holdouts y las trayectorias viven en un almacén privado aparte, y un hook de pre-commit lo comprueba.
 
 ## Decisiones abiertas
