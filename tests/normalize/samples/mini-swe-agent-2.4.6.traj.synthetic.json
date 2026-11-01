@@ -1,0 +1,61 @@
+{
+  "info": {
+    "format": "mini-swe-agent-1.1",
+    "exit_status": "Submitted",
+    "model_stats": {
+      "instance_cost": 0.01,
+      "api_calls": 3
+    }
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Fix divide_round in src/calc.py."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll look at the file.\n```bash\nsed -n '1,40p' src/calc.py\n```",
+      "extra": {
+        "response": {
+          "usage": {
+            "prompt_tokens": 900,
+            "completion_tokens": 40,
+            "prompt_tokens_details": {
+              "cached_tokens": 100
+            }
+          }
+        }
+      }
+    },
+    {
+      "role": "user",
+      "content": "def divide_round(a: int, b: int) -> int:\n    return int(a / b + 0.5)\n"
+    },
+    {
+      "role": "assistant",
+      "content": "Now I'll patch it and run the tests.",
+      "extra": {
+        "actions": [
+          {
+            "command": "python - <<'PY'\nfrom pathlib import Path\nPath('src/calc.py').write_text('def divide_round(a, b):\\n    q, r = divmod(a, b)\\n    return q + (2 * r > b)\\n')\nPY\npython -m pytest -q"
+          }
+        ],
+        "response": {
+          "usage": {
+            "prompt_tokens": 1100,
+            "completion_tokens": 90,
+            "reasoning_tokens": 30
+          }
+        }
+      }
+    },
+    {
+      "role": "user",
+      "content": "1 passed in 0.00s"
+    }
+  ]
+}

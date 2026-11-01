@@ -1,0 +1,6 @@
+{"type":"step_start","timestamp":1762000000000,"sessionID":"ses_synthetic","part":{"id":"prt_1","type":"step-start"}}
+{"type":"reasoning","timestamp":1762000000100,"sessionID":"ses_synthetic","part":{"id":"prt_2","type":"reasoning","text":"The bug is in the rounding helper."}}
+{"type":"text","timestamp":1762000000200,"sessionID":"ses_synthetic","part":{"id":"prt_3","type":"text","text":"I'll inspect the source file."}}
+{"type":"tool_use","timestamp":1762000000300,"sessionID":"ses_synthetic","part":{"id":"prt_4","type":"tool","tool":"read","callID":"call_1","state":{"status":"completed","input":{"filePath":"src/calc.py"},"output":"def divide_round(a: int, b: int) -> int:\n    return int(a / b + 0.5)\n","metadata":{"exit":0}}}}
+{"type":"tool_use","timestamp":1762000000400,"sessionID":"ses_synthetic","part":{"id":"prt_5","type":"tool","tool":"bash","callID":"call_2","state":{"status":"completed","input":{"command":"python -m pytest -q"},"output":"1 passed in 0.00s","metadata":{"exit":0}}}}
+{"type":"step_finish","timestamp":1762000000500,"sessionID":"ses_synthetic","part":{"id":"prt_6","type":"step-finish","reason":"stop","tokens":{"input":1200,"output":80,"reasoning":20,"cache":{"read":600,"write":0}}}}
