@@ -16,14 +16,14 @@
 |---|---|---|---|
 | S1 | El repo es Apache-2.0, privado durante la construcción y público al validarse, sin rastro del piloto | Respuesta del propietario (2026-10-31) | — |
 | S2 | **F0 usa solo tareas públicas recientes** (SWE-rebench y SWE-bench-Live, [06](06-harness-and-tasks.md) §2.1). Los tres repos de producto del piloto entran en F1, con la regla «sin repos de clientes» levantada para ellos | Respuesta del propietario (2026-10-31) | — |
-| S3 | **Uso del código del cliente como dataset de evaluación (F1+)**: la política verificada del propietario cubre qué proveedores de modelos pueden ver ese código, **no su uso como benchmark**, ni guardar tareas, holdouts y trayectorias derivadas | Hueco detectado | El propietario confirma que el contrato con el cliente lo permite |
-| S4 | **El evaluador en Hetzner puede alojar código del cliente (F1+)** (mirror, tests ocultos) | Hueco detectado | El propietario confirma que el servidor está dentro del perímetro permitido |
+| S3 | **Uso del código del cliente como dataset de evaluación (F1+)**: la política verificada del propietario cubre qué proveedores de modelos pueden ver ese código, **no su uso como benchmark**, ni guardar tareas, holdouts y trayectorias derivadas | Hueco detectado | **Confirmado por el propietario el 2026-11-01**: el contrato lo permite. Desde F1 se pueden minar PRs del piloto |
+| S4 | **El evaluador en Hetzner puede alojar código del cliente (F1+)** (mirror, tests ocultos) | Hueco detectado | **Confirmado por el propietario el 2026-11-01**, con una condición: el servidor se comparte con el gateway y con otros servicios, así que el verificador usa Docker rootless y un volumen propio ([02](02-architecture.md) §2, requisito de entrada de F1) |
 | S5 | Sin tope mensual. Presupuesto por ejecución + coste sombra + alarma a los 300 USD de gasto real en Anthropic | Respuesta del propietario | — |
 | S6 | El baseline Claude Code usa **Sonnet** (versión vigente, fijada) | Juicio propio: el prompt fija el agente, no el modelo | El propietario lo confirma o pide Opus |
 | S7 | Documentación en español; código e identificadores en inglés | Respuesta del propietario | — |
-| S8 | **Tipo del servidor Hetzner** (dedicado con `/dev/kvm` o Cloud sin virtualización anidada) | Desconocido | Solo afecta al [ADR-0003](adr/0003-sandbox.md) en F2 |
+| S8 | **Tipo del servidor Hetzner** | **Cerrado el 2026-11-01**: Cloud, sin `/dev/kvm`, 16 vCPU y 30 GB, compartido con el gateway y con servicios de otros proyectos [Cierto] | F2 necesita otra máquina si se activa el [ADR-0003](adr/0003-sandbox.md). Falta comprobar `/dev/kvm` en la torre |
 | S9 | **Qué es «aitire»** (proveedor del gateway mencionado por el propietario) | Desconocido | Clasificarlo en la matriz de [02](02-architecture.md) §8 antes de habilitarlo |
-| S10 | La instancia compartida del gateway admite equipos dedicados sin interferir con otros usos | Juicio propio | F0-03 |
+| S10 | La instancia compartida del gateway admite equipos dedicados sin interferir con otros usos. El host también corre servicios de otros proyectos, que compiten por CPU con el verificador | Juicio propio | F0-03 y F0-21 |
 | S11 | La torre tiene un kernel con nftables `fib inet`, así que el control de egress de Harbor funcionará allí | [Probable]: falla en macOS | F0-07 |
 | S12 | El modelo local es de clase Qwen3.6-35B-A3B y cabe cuantizado con 64k de contexto en 32 GB | [Suposición] | F0-03 |
 | S13 | El minado del piloto rinde ~20 % de los PRs que tocan tests, como SWE-bench. Ya no afecta a F0: solo importa si en F1+ se mina el piloto | [Probable] por analogía | Una medición de elegibilidad en F1, si S3 lo permite |
@@ -73,5 +73,5 @@ Lo que no se incorporó, o solo en parte:
 ## Decisiones abiertas
 
 - D1, D2 y D3 de §1.
-- S3 y S4 deben confirmarse **antes de F1** (cuando entra código del piloto). Ya no bloquean F0.
+- S3 y S4 están confirmados (2026-11-01). Queda la condición de S4, que es requisito de entrada de F1.
 - S14 debe confirmarse antes de F0-18 (la matriz usa z.ai en tres brazos).

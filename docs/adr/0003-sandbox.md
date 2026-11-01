@@ -25,7 +25,7 @@ El ejecutor corre código no confiable con una virtual key. Hace falta: aislamie
 - (b) best-of-n necesita fork o snapshot de memoria para que M6 sea viable;
 - (c) aparece un escape de contenedor relevante.
 
-Requisito previo: confirmar que la torre o un Hetzner dedicado exponen `/dev/kvm` ([09](../09-open-questions.md)).
+Requisito previo: una máquina con `/dev/kvm`. El servidor Hetzner actual es Cloud y no lo tiene [Cierto, comprobado el 2026-11-01]. Haría falta un Hetzner dedicado o la torre, que está sin comprobar ([09](../09-open-questions.md) S8).
 
 ## Consecuencias
 

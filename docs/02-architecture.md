@@ -1,6 +1,6 @@
 # 02 · Arquitectura
 
-> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, por donde pasan los modelos y el dinero). Un orquestador determinista mueve artefactos entre ellas, siempre con pull desde Hetzner. Los LLM solo viven en los nodos de ejecución y en las señales blandas. En F0 orquestan Harbor y unos scripts; en F1, un runner DOT mínimo. Cada componente justifica en §7 la métrica que mueve o la restricción que cumple.
+> **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, por donde pasan los modelos y el dinero). El gateway y el verificador comparten un servidor Hetzner Cloud: ahí las zonas se separan por credenciales, usuario, contenedor y volumen, no por máquina. Un orquestador determinista mueve artefactos entre ellas, siempre con pull desde Hetzner. Los LLM solo viven en los nodos de ejecución y en las señales blandas. En F0 orquestan Harbor y unos scripts; en F1, un runner DOT mínimo. Cada componente justifica en §7 la métrica que mueve o la restricción que cumple.
 
 ## 1. Capas
 
@@ -31,10 +31,10 @@ flowchart TB
     SB1 & SB2 --> ART
     OTEL --> ART
   end
-  subgraph GW["Gateway (LiteLLM) — zona DINERO"]
+  subgraph GW["Gateway (LiteLLM, contenedor en el host de Hetzner) — zona DINERO"]
     LL["LiteLLM<br/>virtual key por ejecución<br/>equipos por clase de datos"]
   end
-  subgraph HZ["Hetzner — zona VERIFICADOR"]
+  subgraph HZ["Hetzner Cloud — zona VERIFICADOR (usuario y volumen propios)"]
     VER["Verificador<br/>(checkout limpio + capas duras)"]
     MIR["Mirror de repos (solo lectura)"]
     HOLD["Holdouts y tests ocultos<br/>(repo privado, deploy key local)"]
@@ -58,9 +58,10 @@ flowchart TB
   PUB -- "PR en borrador" --> GH[(GitHub)]
 ```
 
-- **Dónde vive el gateway**: se reutiliza la instancia LiteLLM existente del propietario, con equipos y claves dedicados a la factory. Su host está en `factory-pilot-data`, no en este repo. Si la configuración de equipos o de precios choca con otros usos, se separa en una instancia propia ([ADR-0004](adr/0004-gateway.md), cómo revertir).
-- **La torre no puede llegar a los holdouts**: no tiene la deploy key ni una ruta de red al almacén del verificador. **Todo movimiento de datos entre zonas es un pull desde Hetzner** (artefactos, trayectorias, telemetría). La torre nunca empuja nada a Hetzner.
-- **El OTel Collector vive en la torre**, en la red interna de los sandboxes junto al gateway. Recibe la telemetría de Claude Code y la escribe como JSONL en el almacén de artefactos, de donde Hetzner la recoge. Los sandboxes no tienen ninguna ruta hacia Hetzner.
+- **Dónde vive el gateway**: se reutiliza la instancia LiteLLM existente del propietario, con equipos y claves dedicados a la factory. Su host está en `factory-pilot-data`, no en este repo. Es un servidor Hetzner Cloud sin `/dev/kvm` que también aloja el verificador y servicios de otros proyectos del propietario [Cierto, comprobado el 2026-11-01]. Si la configuración de equipos o de precios choca con otros usos, se separa en una instancia propia ([ADR-0004](adr/0004-gateway.md), cómo revertir).
+- **La torre no puede llegar a los holdouts**: no tiene la deploy key, y su única ruta de red hacia el host de Hetzner es el puerto del gateway. **Todo movimiento de datos entre zonas es un pull desde Hetzner** (artefactos, trayectorias, telemetría). La torre nunca empuja nada a Hetzner.
+- **El OTel Collector vive en la torre**, en la red interna de los sandboxes junto al gateway. Recibe la telemetría de Claude Code y la escribe como JSONL en el almacén de artefactos, de donde Hetzner la recoge. Los sandboxes no tienen más ruta hacia Hetzner que el puerto del gateway.
+- **Separación en el host compartido**. El verificador corre con un usuario de sistema propio y **Docker rootless**. El mirror y los holdouts viven en un volumen que solo ve ese usuario. LiteLLM y los demás servicios del host corren en contenedores que no montan ese volumen. Un usuario con acceso al socket de Docker del sistema es root a efectos prácticos [Cierto, [Docker security](https://docs.docker.com/engine/security/#docker-daemon-attack-surface)], así que sin Docker rootless la separación por usuario no vale nada. En F0 basta, porque los tests ocultos son públicos en Hugging Face y solo deben quedar fuera del alcance del agente. Para F1, con código del cliente, es requisito de entrada; si no se puede cumplir, el verificador pasa a otra máquina ([07](07-roadmap.md) F1).
 - **El publicador** corre en Hetzner (o donde viva el token de GitHub) y no en la torre. Es el único proceso con permiso de escritura en GitHub, y solo actúa sobre veredictos `accept` cuyo `diff_sha` coincide.
 
 ## 3. Flujo F0 (baseline)
@@ -169,5 +170,5 @@ Detalle en el [ADR-0009](adr/0009-data-policy-per-repo.md). Se aplica en el gate
 ## Decisiones abiertas
 
 - Si el gateway compartido admite equipos dedicados sin interferir con otros usos, o si conviene una instancia propia desde el principio.
-- Tipo del servidor Hetzner (dedicado o Cloud). No afecta a F0 ni a F1, pero sí al [ADR-0003](adr/0003-sandbox.md) en F2.
+- Resuelto el 2026-11-01: el servidor Hetzner es Cloud, sin `/dev/kvm` [Cierto]. Si en F2 se activa el [ADR-0003](adr/0003-sandbox.md), hace falta otra máquina.
 - Dónde vive el almacén de artefactos de la torre (disco local o MinIO). Por minimalismo, disco local + `rsync` pull desde Hetzner en F0.

@@ -1,6 +1,6 @@
 # 05 · Diseño del verificador
 
-> **Resumen.** El verificador es el único que decide si se acepta un cambio, y está aislado del generador **por construcción**: otra máquina, otras credenciales y otro mirror, y del generador solo recibe el diff. El código candidato se ejecuta en un contenedor efímero sin red. Las capas duras (diff-guard, P2P, F2P oculto, holdouts, mutation, SAST) bloquean. Las blandas solo ordenan o reintentan, y el reintento recibe solo una categoría. Hay 30 amenazas, cada una con su capa y su fixture o marcada como fuera de alcance.
+> **Resumen.** El verificador es el único que decide si se acepta un cambio, y está aislado del generador **por construcción**: otras credenciales, otro usuario de sistema y otro mirror (comparte servidor con el gateway, separado como dice [02](02-architecture.md) §2), y del generador solo recibe el diff. El código candidato se ejecuta en un contenedor efímero sin red. Las capas duras (diff-guard, P2P, F2P oculto, holdouts, mutation, SAST) bloquean. Las blandas solo ordenan o reintentan, y el reintento recibe solo una categoría. Hay 30 amenazas, cada una con su capa y su fixture o marcada como fuera de alcance.
 
 ## 1. Principios
 
