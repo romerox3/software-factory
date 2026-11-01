@@ -155,6 +155,11 @@
     "kind": "diff"
   },
   {
+    "threat": "T29",
+    "fixture": "forge-report-atexit",
+    "kind": "diff"
+  },
+  {
     "threat": "T30",
     "fixture": "tamper-gitattributes",
     "kind": "diff"

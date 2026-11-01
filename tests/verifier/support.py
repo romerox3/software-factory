@@ -165,6 +165,64 @@ def junit_xml(cases: dict[str, str]) -> str:
     return "<testsuites><testsuite name='pytest'>" + "".join(rows) + "</testsuite></testsuites>"
 
 
+def node_id(dotted: str) -> str:
+    """``tests.test_calc::test_x`` -> ``tests/test_calc.py::test_x`` (JUnit to pytest node id)."""
+    path, _, name = dotted.partition("::")
+    return f"{path.replace('.', '/')}.py::{name}"
+
+
+TOKEN = "0123456789abcdef0123456789abcdef"
+TRIPWIRE = "fv_tripwire_000000000000"
+
+
+def frame(token: str = TOKEN, **fields: Any) -> str:
+    return f"FV:{token}:{json.dumps(fields, separators=(',', ':'))}"
+
+
+def hello(token: str = TOKEN, tripwire: str = TRIPWIRE) -> str:
+    return f"FVHELLO:{token}:" + json.dumps({"v": 1, "tripwire": tripwire})
+
+
+def report_frames(
+    test_id: str, status: str, *, token: str = TOKEN, xfail: bool = False
+) -> list[str]:
+    """The three frames the plugin sends for one test, for a final ``status``."""
+    setup, call, teardown = "passed", "passed", "passed"
+    if status == "failed":
+        call = "failed"
+    elif status == "error":
+        setup = "failed"
+    elif status == "skipped":
+        call = "skipped"
+    return [
+        frame(token, t="r", id=test_id, when="setup", o=setup, x=False),
+        frame(token, t="r", id=test_id, when="call", o=call, x=xfail),
+        frame(token, t="r", id=test_id, when="teardown", o=teardown, x=False),
+    ]
+
+
+def stream_lines(
+    cases: dict[str, str], *, exit_status: int = 0, tripwire: str | None = "failed"
+) -> list[str]:
+    """A result stream for ``{"tests.test_calc::test_x": "passed" | ...}`` plus the tripwire."""
+    lines = [hello()]
+    count = 0
+    for dotted, status in cases.items():
+        frames = report_frames(node_id(dotted), status)
+        lines += frames
+        count += len(frames)
+    if tripwire is not None:
+        wire = report_frames("::" + TRIPWIRE, tripwire)
+        lines += wire
+        count += len(wire)
+    lines.append(frame(t="end", exit=exit_status, frames=count))
+    return lines
+
+
+def stream_bytes(cases: dict[str, str], **options: Any) -> bytes:
+    return ("\n".join(stream_lines(cases, **options)) + "\n").encode()
+
+
 class FakeSandbox:
     """Runs ``behavior(request)`` instead of a container, so error paths can be forced."""
 

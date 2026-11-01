@@ -18,6 +18,7 @@ from .support import (
     junit_xml,
     load_json,
     report_path,
+    stream_bytes,
 )
 
 ROUND = "py-calc-round"
@@ -37,9 +38,13 @@ def all_passed() -> dict[str, str]:
 
 
 def writes(content: str | dict[str, str], *, exit_code: int = 0, **result: object):
+    """A run that writes the JUnit report and, for a dict, the matching sealed result stream."""
+
     def behavior(request: RunRequest) -> RunResult:
         text = junit_xml(content) if isinstance(content, dict) else content
         report_path(request).write_text(text, encoding="utf-8")
+        if isinstance(content, dict) and "stdout" not in result:
+            result["stdout"] = stream_bytes(content, exit_status=exit_code)
         return RunResult(exit_code=exit_code, **result)  # type: ignore[arg-type]
 
     return behavior

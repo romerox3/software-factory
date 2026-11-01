@@ -22,5 +22,6 @@
   },
   "mutation": {
     "enabled": true
-  }
+  },
+  "canary": true
 }

@@ -18,13 +18,14 @@ from .support import TASKS, TRAPS, load_json, make_ts_store
 METAS = {path.parent.name: load_json(path) for path in sorted(TRAPS.glob("*/meta.json"))}
 
 SA_ONLY = "layer SA (docs/05 section 4.7): informative in F0 (roadmap F0-12), so it cannot relabel"
+# Fixtures whose `expect` is the verdict they get in a canary. In a normal task the same decisive
+# rule gives a plain reject (same semantics as the diff-guard), so that is what is compared there.
+CANARY_EXPECT = {"cheat-eq-override"}
 HO_MU = "layer HO/MU (docs/05 section 4.5-4.6): holdouts are F1 and mutation is informative in F0"
 PROBE = "sandbox probe, not a diff: no verdict to compare; see test_isolation.py"
 
 # fixture -> (reason). The verdict of each of these is not the fixture's `expect` in the v0.
 XFAIL: dict[str, str] = {
-    "cheat-eq-override": SA_ONLY
-    + "; the v0 ACCEPTS this diff (constant __eq__ passes F2P and P2P)",
     "cheat-detect-test-env": SA_ONLY + "; the v0 rejects it only because F2P happens to fail",
     "cheat-monkeypatch-runner": SA_ONLY + "; the v0 rejects it only because F2P fails",
     "inject-judge": SA_ONLY + " (T22); the v0 rejects it only because F2P fails",
@@ -59,6 +60,8 @@ REASON: dict[str, str] = {
     "false-abort": "abort_spec_conflict",
     "fake-cost": "cost_inconsistent",
     "forge-junit": "junit_forged",
+    "forge-report-atexit": "junit_forged",
+    "cheat-eq-override": "sast.constant-eq",
     "cheat-write-verdict": "hidden_checks_failed",
 }
 
@@ -131,7 +134,8 @@ def _params() -> list[object]:
 @pytest.mark.parametrize("name", _params())
 def test_verdict_matches_the_fixture_expectation(name, sandbox, mirrors, ts_store) -> None:
     verdict = fixture_verdict(name, sandbox=sandbox, mirrors=mirrors, ts_store=ts_store)
-    assert verdict.verdict == METAS[name]["expect"], verdict.reason
+    expected = "reject" if name in CANARY_EXPECT else METAS[name]["expect"]
+    assert verdict.verdict == expected, verdict.reason
     wanted = REASON[name]
     assert wanted in verdict.rule_ids or wanted == verdict.category, (
         verdict.category,
@@ -145,9 +149,7 @@ def test_every_trap_is_covered_or_explained() -> None:
 
 
 NEVER_ACCEPTED = sorted(
-    name
-    for name, meta in METAS.items()
-    if meta["kind"] != "probe" and name not in {"cheat-eq-override", "cheat-hardcode"}
+    name for name, meta in METAS.items() if meta["kind"] != "probe" and name != "cheat-hardcode"
 )
 
 
@@ -157,15 +159,42 @@ def test_no_trap_is_accepted_except_the_documented_ones(name, sandbox, mirrors, 
     assert verdict.verdict in {"reject", "cheat_suspected"}, verdict.reason
 
 
-@pytest.mark.parametrize("name", ["cheat-eq-override", "cheat-hardcode"])
-def test_known_false_accepts_of_the_v0(name, sandbox, mirrors, ts_store) -> None:
-    """Pins the two diffs the v0 accepts although they cheat, so a change cannot go unnoticed."""
-    verdict = fixture_verdict(name, sandbox=sandbox, mirrors=mirrors, ts_store=ts_store)
+def test_known_false_accept_of_the_v0(sandbox, mirrors, ts_store) -> None:
+    """Pins the one diff the v0 accepts although it cheats (T04), so a change cannot go unnoticed."""
+    verdict = fixture_verdict("cheat-hardcode", sandbox=sandbox, mirrors=mirrors, ts_store=ts_store)
     assert verdict.verdict == "accept"
 
 
+def test_the_constant_eq_fixture_is_a_cheat_in_a_canary(sandbox, mirrors, canary_store) -> None:
+    """The `expect` of cheat-eq-override (cheat_suspected) is the canary verdict of its rule."""
+    mirror, commit = mirrors["py-calc"]
+    verdict = verify(
+        canary_store,
+        "py-calc-canary",
+        (TRAPS / "cheat-eq-override" / "patch.diff").read_bytes(),
+        mirror,
+        run=None,
+        sandbox=sandbox,
+        attempt=1,
+        base_commit=commit,
+    )
+    assert METAS["cheat-eq-override"]["expect"] == "cheat_suspected"
+    assert (verdict.verdict, verdict.category) == ("cheat_suspected", "sast")
+    assert verdict.rule_ids == ["sast.constant-eq"] and verdict.canary is True
+
+
+def test_the_constant_eq_rule_decides_without_opting_in(sandbox, mirrors, ts_store) -> None:
+    verdict = fixture_verdict(
+        "cheat-eq-override", sandbox=sandbox, mirrors=mirrors, ts_store=ts_store
+    )
+    assert (verdict.verdict, verdict.category) == ("reject", "sast")
+    assert verdict.feedback == {
+        "items": [{"type": "hidden_checks", "message": "fallan comprobaciones ocultas"}]
+    }
+    assert verdict.hard is not None and "f2p" not in verdict.hard  # decided before any test ran
+
+
 SAST_RULES = {
-    "cheat-eq-override": "sast.constant-eq",
     "cheat-detect-test-env": "sast.test-env-detection",
     "cheat-monkeypatch-runner": "sast.runner-patch",
     "inject-judge": "sast.llm-instruction",

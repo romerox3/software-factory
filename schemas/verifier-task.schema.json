@@ -58,6 +58,10 @@
           "type": "boolean"
         }
       }
+    },
+    "canary": {
+      "description": "Optional, default false. True marks a canary task (docs/05 section 7): its visible tests are deliberately mutated. The verifier decides on this field; it never infers it. It lives only in the hidden part, which the generator never sees.",
+      "type": "boolean"
     }
   }
 }

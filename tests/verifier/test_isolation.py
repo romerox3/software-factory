@@ -48,6 +48,41 @@ def test_docker_arguments_are_the_isolated_ones(sandbox, tmp_path) -> None:
     assert len(mounts) == 2
     assert mounts[0].endswith(":/workspace:rw") and mounts[1].endswith(":/logs/verifier:rw")
     assert not any("TOKEN" in value or "KEY" in value for value in args)
+    assert args[args.index("--log-driver") + 1] == "none"  # no unbounded copy of stdout on the host
+
+
+def test_extra_mounts_are_read_only_and_pythonpath_extends_the_image_one(sandbox, tmp_path) -> None:
+    request = RunRequest(
+        "sha256:" + "a" * 64,
+        tmp_path / "w",
+        tmp_path / "l",
+        "true",
+        10,
+        env=(("PYTHONPATH", "/opt/factory-verifier"), ("PYTEST_ADDOPTS", "-p x")),
+        read_only_mounts=((tmp_path / "p", "/opt/factory-verifier"),),
+    )
+    args = sandbox.docker_args(request, "name", {"PYTHONPATH": "/srv/lib", "PATH": "/bin"})
+    mounts = [args[i + 1] for i, value in enumerate(args) if value == "-v"]
+    assert mounts[2] == f"{tmp_path / 'p'}:/opt/factory-verifier:ro"
+    variables = [args[i + 1] for i, value in enumerate(args) if value == "-e"]
+    assert "PYTHONPATH=/opt/factory-verifier:/srv/lib" in variables
+    assert "PYTEST_ADDOPTS=-p x" in variables
+    assert sum(item.startswith("PYTEST_ADDOPTS=") for item in variables) == 1
+
+
+def test_the_plugin_mount_cannot_be_written_from_inside(sandbox, image, box, tmp_path) -> None:
+    plugin = tmp_path / "plugin"
+    plugin.mkdir()
+    (plugin / "x.py").write_text("", encoding="utf-8")
+    plugin.chmod(0o755)
+    workspace, logs = box
+    command = "python -c \"open('/opt/factory-verifier/new', 'w')\" 2>&1; echo ec=$?; ls /opt/factory-verifier"
+    request = RunRequest(
+        image, workspace, logs, command, 60, read_only_mounts=((plugin, "/opt/factory-verifier"),)
+    )
+    result = sandbox.run(request)
+    assert "Read-only file system" in result.stdout_tail and "ec=1" in result.stdout_tail
+    assert "new" not in result.stdout_tail.split("ec=1")[-1]
 
 
 def test_container_has_no_network_no_root_and_a_read_only_filesystem(sandbox, image, box) -> None:

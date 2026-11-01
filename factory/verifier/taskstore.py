@@ -42,6 +42,7 @@ class Task:
     verifier_bytes: bytes
     overlay: dict[str, bytes]
     spec_paths: frozenset[str]
+    canary: bool = False
 
     @property
     def patch_line_cap(self) -> int:
@@ -140,4 +141,5 @@ def load_task(store: Path, task_id: str) -> Task:
         verifier_bytes=verifier_bytes,
         overlay=overlay,
         spec_paths=spec_paths,
+        canary=verifier.get("canary", False),
     )

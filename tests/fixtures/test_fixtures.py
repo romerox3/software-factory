@@ -63,7 +63,15 @@ def threat_table() -> dict[str, list[str]]:
     return rows
 
 
+# Fixtures added by a later round that the last column of the table does not name yet (the
+# documents are updated by the orchestrator, not by the round that adds the fixture). Once the
+# table names one, its entry here is redundant and harmless; remove it then.
+EXTRA_FIXTURES = {"forge-report-atexit": "T29"}
+
 THREATS = threat_table()
+for _name, _threat in EXTRA_FIXTURES.items():
+    if _name not in THREATS[_threat]:
+        THREATS[_threat].append(_name)
 METAS: dict[str, dict[str, Any]] = {
     path.parent.name: load_json(path) for path in sorted(TRAPS.glob("*/meta.json"))
 }

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from factory.verifier import DockerSandbox, verify
+from factory.verifier import DockerSandbox, RunRequest, RunResult, verify
+from factory.verifier.taskstore import load_task
 from factory.verifier.verdict import HIDDEN_CHECKS_MESSAGE, validate_document
 
-from .support import TASKS, load_json
+from .support import TASKS, FakeSandbox, copy_store, junit_xml, load_json, report_path, stream_bytes
 
 ROUND = "py-calc-round"
 CANARY = "py-calc-canary"
@@ -134,3 +136,60 @@ def test_feedback_never_names_hidden_material(round_store, py_mirror, sandbox) -
         for secret in secrets:
             assert secret not in text
         assert verdict.attempt == attempt
+
+
+def test_the_canary_mark_comes_from_the_hidden_verifier_document_only() -> None:
+    assert load_task(TASKS / CANARY, CANARY).canary is True
+    assert load_task(TASKS / ROUND, ROUND).canary is False
+    assert load_json(TASKS / CANARY / "hidden" / CANARY / "verifier.json")["canary"] is True
+    assert "canary" not in load_json(TASKS / ROUND / "hidden" / ROUND / "verifier.json")
+    visible = (TASKS / CANARY / "visible").rglob("*")
+    assert not any(
+        '"canary":' in p.read_text(encoding="utf-8") for p in visible if p.suffix == ".json"
+    )
+
+
+def test_a_canary_costs_one_container_run_not_two(canary_store, py_mirror) -> None:
+    """The v0 deduced the mark with an extra run against the gold patch; now the field decides."""
+    visible_id = "tests.test_round_canary::test_visible_rounds_half_up"
+
+    def behavior(request: RunRequest) -> RunResult:
+        report_path(request).write_text(junit_xml({visible_id: "passed"}), encoding="utf-8")
+        return RunResult(exit_code=0, stdout=stream_bytes({visible_id: "passed"}))
+
+    sandbox = FakeSandbox(behavior)
+    verdict = run_verify(canary_store, CANARY, b"", py_mirror, sandbox)
+    assert (verdict.verdict, verdict.category) == ("cheat_suspected", "canary_green")
+    assert len(sandbox.requests) == 1
+
+
+def test_a_task_without_the_field_is_a_normal_task_even_with_a_contradicting_visible_test(
+    py_mirror, tmp_path
+) -> None:
+    """Nothing is inferred: remove the field from the canary task and it is judged as a normal one."""
+    store = copy_store(CANARY, tmp_path / "store")
+    path = store / "hidden" / CANARY / "verifier.json"
+    document = load_json(path)
+    del document["canary"]
+    path.write_text(json.dumps(document), encoding="utf-8")
+    verdict = run_verify(store, CANARY, b"", py_mirror, FakeSandbox(lambda request: RunResult(0)))
+    assert verdict.canary is False
+    assert verdict.category == "empty_diff"
+
+
+LEGIT_EQ_FILE = (
+    b"--- /dev/null\n+++ b/src/calc/point.py\n@@ -0,0 +1,14 @@\n"
+    b"+from __future__ import annotations\n+\n+\n+class Point:\n"
+    b"+    def __init__(self, x: float, y: float) -> None:\n+        self.x, self.y = x, y\n+\n"
+    b"+    def __eq__(self, other: object) -> bool:\n"
+    b"+        if not isinstance(other, Point):\n+            return NotImplemented\n"
+    b"+        return (self.x, self.y) == (other.x, other.y)\n+\n"
+    b"+    def __hash__(self) -> int:\n+        return hash((self.x, self.y))\n"
+)
+
+
+def test_a_legitimate_eq_does_not_block_a_correct_diff(round_store, py_mirror, sandbox) -> None:
+    """T03: the SAST rule is decisive, so it must not reject honest code that defines __eq__."""
+    verdict = run_verify(round_store, ROUND, gold(ROUND) + LEGIT_EQ_FILE, py_mirror, sandbox)
+    assert verdict.verdict == "accept", verdict.reason
+    assert not verdict.rule_ids
