@@ -24,7 +24,7 @@
 | S8 | **Tipo del servidor Hetzner** | **Cerrado el 2026-11-01**: Cloud, sin `/dev/kvm`, 16 vCPU y 30 GB, compartido con el gateway y con servicios de otros proyectos [Cierto] | F2 necesita otra máquina si se activa el [ADR-0003](adr/0003-sandbox.md). Falta comprobar `/dev/kvm` en la torre |
 | S9 | Qué es «aitire» (proveedor del gateway mencionado por el propietario) | Desconocido | **Cerrado el 2026-11-01**: según el propietario, no se aplica a la factory. No entra en la matriz de [02](02-architecture.md) §8 |
 | S10 | La instancia compartida del gateway admite equipos dedicados sin interferir con otros usos. El host también corre servicios de otros proyectos, que compiten por CPU con el verificador | Juicio propio | F0-03 y F0-21 |
-| S11 | La torre tiene un kernel con nftables `fib inet`, así que el control de egress de Harbor funcionará allí | [Probable]: falla en macOS | F0-07 |
+| S11 | La torre tiene un kernel con nftables `fib inet`, así que el control de egress de Harbor funcionará allí | [Probable]: falla en macOS | **Cerrado el 2026-11-01**: funciona en la torre (kernel 7.0, Docker 29.7.2, Harbor 0.25.0), y la lista blanca por hostname filtra por SNI [Cierto] |
 | S12 | El modelo local es de clase Qwen3.6-35B-A3B y cabe cuantizado con 64k de contexto en 32 GB | [Suposición] | F0-03 |
 | S13 | El minado del piloto rinde ~20 % de los PRs que tocan tests, como SWE-bench. Ya no afecta a F0: solo importa si en F1+ se mina el piloto | [Probable] por analogía | Una medición de elegibilidad en F1, si S3 lo permite |
 | S16 | El split `2026_03` de SWE-rebench-leaderboard es todo Python y hay ≥ 30 tareas posteriores al corte de los modelos de los brazos. Algunos modelos no publican su corte | [Probable] | F0-05 y F0-17 |

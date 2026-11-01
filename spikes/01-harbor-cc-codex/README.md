@@ -59,7 +59,8 @@ Coste estimado de la parte B: sin gasto real; unos pocos puntos de la ventana de
 |---|---|---|
 | B4 | Una key con `max_budget = 1e-05` acepta la primera llamada y rechaza las siguientes con **HTTP 429** y `error.type = "budget_exceeded"` [Cierto]. El corte llega una petición tarde: la llamada que cruza el límite se sirve (gasto 1,01e-05 frente a 1e-05) | El adaptador mapea `budget_exceeded` por `error.type`, no por el código, porque un 429 también puede ser un límite de ritmo. El presupuesto de la key es un fusible con un exceso de hasta una petición |
 | B5 | Ningún modelo de los equipos de la factory tiene precio 0. Los que lo tienen en el gateway (los `:free` de OpenRouter y los de audio o imagen de NaN) quedan fuera de los equipos [Cierto] | El problema de que «un coste 0 se salta el presupuesto» se evita por construcción. El smoke de F0-03 comprueba que ningún modelo de un equipo de la factory tiene precio 0 |
-| B1, B2, B3, B6, B7 | Pendientes: B1 y B2 necesitan el token de la suscripción, que tiene que generar el propietario en su PC; B3 y B7, Codex y Harbor contra el gateway; B6, la torre (F0-07) | — |
+| B6 | En la torre (Linux, kernel 7.0, Docker 29.7.2), `network_mode = "allowlist"` con el nombre del gateway: el gateway es alcanzable, y example.com, `api.github.com` y otra web de la misma CDN no lo son. Reward 1 [Cierto] | La red del sandbox queda resuelta con el sidecar de Harbor, que filtra por SNI ([02](../../docs/02-architecture.md) §6). DNS hacia el resolvedor sigue abierto (riesgo residual) |
+| B1, B2, B3, B7 | Pendientes: B1 y B2 necesitan el token de la suscripción, que tiene que generar el propietario en su PC; B3 y B7, Codex y Harbor contra el gateway | — |
 
 ## 5. Cómo reproducir la parte A
 

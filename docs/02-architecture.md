@@ -122,8 +122,10 @@ flowchart LR
 
 ## 6. Red
 
-- Los sandboxes se conectan a una red Docker dedicada (`factory-egress`). En el host, unas reglas de `iptables`/`nftables` en la cadena `DOCKER-USER` solo dejan pasar tráfico hacia `IP:puerto` del gateway y del OTel Collector local. No hay DNS público y los nombres internos se resuelven con `--add-host`.
-- Se aplica en el host y no en Harbor porque Harbor tiene abiertas las issues de red privada sin Internet y de allowlist ([#3611](https://github.com/harbor-framework/harbor/issues/3611), [#3992](https://github.com/harbor-framework/harbor/issues/3992), [#3821](https://github.com/harbor-framework/harbor/issues/3821)) [Cierto, abiertas el 2026-10-31]. Si Harbor no puede usar una red Docker concreta, el spike 1 lo detectará y el plan B es ejecutar el agente con la subclase propia, que crea el contenedor ella misma.
+- **El gateway se publica detrás de Cloudflare**: su nombre resuelve a IPs anycast compartidas con muchas otras webs [Cierto, DNS del 2026-11-01]. Una regla por `IP:puerto` en `DOCKER-USER`, que era el diseño del 2026-10-31, abriría todas esas webs, así que se descarta.
+- **Salida del sandbox**: modo `network_mode = "allowlist"` de Harbor, con `allowed_hosts` igual al nombre del gateway (el valor está en el almacén privado). Harbor lo aplica con un sidecar que filtra **por SNI** (gost) y con nftables `fib inet` [Cierto, `harbor-docker-egress-control-sidecar/bin/network-policy`, v0.25.0]. **Probado en la torre el 2026-11-01** con `network-probe`: el gateway es alcanzable, y example.com, `api.github.com` y otra web de la misma Cloudflare no lo son (reward 1) [Cierto]. Si el kernel no soporta el sidecar, Harbor rechaza la tarea, así que falla de forma cerrada.
+- **Riesgo residual**: el sidecar deja pasar DNS hacia los resolvedores de `resolv.conf` [Cierto, mismo fichero]. El sandbox puede hacer consultas DNS, que son un canal de exfiltración lento pero no sirven para descargar un fix. Se acepta en F0. Si aparece en las trayectorias, se añade un resolvedor propio que solo responda al nombre del gateway.
+- El OTel Collector local se añade a la lista blanca por IP cuando entre la telemetría de Claude Code (F0-13).
 - El verificador ejecuta los tests con `--network none`, salvo en las tareas que declaren gemelos de servicios (WireMock o Testcontainers) en su propia red interna.
 
 ## 7. Justificación de cada componente (minimalismo verificable)
