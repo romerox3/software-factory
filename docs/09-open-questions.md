@@ -7,8 +7,8 @@
 | # | Decisión | Opciones | Qué bloquea | Recomendación |
 |---|---|---|---|---|
 | D1 | **¿Pueden ver código del piloto OpenAI, NaN u OpenRouter?** | Ninguno (por defecto) · solo OpenAI con retención cero · otros | El brazo «Codex con modelo de OpenAI» **desde F1**. En F0 no bloquea nada: las tareas son públicas ([ADR-0009](adr/0009-data-policy-per-repo.md)) | **Decidido el 2026-11-01: NaN y OpenRouter, sí; OpenAI, no.** A2′ también queda descartado en F0 |
-| D2 | **Licencia de orca-role-hook** | Pedir a Felipe Castaño Apache-2.0 o MIT · no pedir nada | Solo un eventual port de `verify_task.py` o `crosscheck.sh`. El diseño no lo necesita ([ADR-0007](adr/0007-orca-role-hook.md)) | Pedirla de todos modos para poder citar o portar sin dudas. Preguntarle además si los commits firmados con su correo de Vicomtech (3, todos en `bin/agent.sh`) tienen alguna reclamación de su empleador. Ningún otro activo candidato tiene commits de ese correo |
-| D3 | **¿Aceptas que F3 dependa del volumen (≥ 150 cambios por clase) y no del calendario?** | Sí · bajar el umbral (por ejemplo, 60 cambios → cota ~5 %) | El criterio de [ADR-0008](adr/0008-gates-and-auto-merge.md) | Sí. Bajar el volumen sube la cota de regresiones aceptada, y eso es una decisión de riesgo, no técnica |
+| D2 | **Licencia de orca-role-hook** | Pedir a Felipe Castaño Apache-2.0 o MIT · no pedir nada | Solo un eventual port de `verify_task.py` o `crosscheck.sh`. El diseño no lo necesita ([ADR-0007](adr/0007-orca-role-hook.md)) | **Decidido el 2026-11-01: se reimplementan ideas y no se espera la licencia.** Recomendación original: pedirla de todos modos para poder citar o portar sin dudas. Preguntarle además si los commits firmados con su correo de Vicomtech (3, todos en `bin/agent.sh`) tienen alguna reclamación de su empleador. Ningún otro activo candidato tiene commits de ese correo |
+| D3 | **¿Aceptas que F3 dependa del volumen (≥ 150 cambios por clase) y no del calendario?** | Sí · bajar el umbral (por ejemplo, 60 cambios → cota ~5 %) | El criterio de [ADR-0008](adr/0008-gates-and-auto-merge.md) | **Decidido el 2026-11-01: sí, por volumen.** Bajar el volumen sube la cota de regresiones aceptada, y eso es una decisión de riesgo, no técnica |
 
 ## 2. Supuestos con los que se escribió el plan
 
@@ -73,6 +73,6 @@ Lo que no se incorporó, o solo en parte:
 
 ## Decisiones abiertas
 
-- D1, D2 y D3 de §1.
+- D1, D2 y D3 están decididas (2026-11-01, §1).
 - S3 y S4 están confirmados (2026-11-01). Queda la condición de S4, que es requisito de entrada de F1.
 - S18 (cuota de los planes) se decide antes de F0-18, con la medición del spike B.

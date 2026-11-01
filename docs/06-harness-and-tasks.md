@@ -13,7 +13,7 @@
 | Fase | Fuente | Por qué |
 |---|---|---|
 | **F0** | **Tareas públicas recientes** (§2.1) | F0 mide el harness y compara brazos, y para eso da igual de quién sea el código, siempre que la tarea sea posterior al corte de los modelos y del stack que interesa. Sin datos del cliente, F0 no depende de S3, S4 ni D1 ([09](09-open-questions.md)); los peones trabajan con tareas reales; y el conjunto congelado de M8 se puede publicar |
-| **F1+** | **Issues reales del piloto** (pipeline issue → PR en borrador) y, si S3 lo permite, PRs minados del piloto para el conjunto rotativo (§2.2) | M3, M4 y M6 solo existen donde una persona revisa y fusiona. La autonomía (F3) se gana en el repo donde se fusiona el código |
+| **F1+** | **Issues reales del piloto** (pipeline issue → PR en borrador) y PRs minados del piloto (S3 confirmado el 2026-11-01) para el conjunto rotativo (§2.2) | M3, M4 y M6 solo existen donde una persona revisa y fusiona. La autonomía (F3) se gana en el repo donde se fusiona el código |
 
 F0 no dice nada concreto sobre el código del piloto: lo dice F1. **Ninguna decisión de autonomía se toma con datos de F0.**
 
@@ -39,7 +39,7 @@ F0 no dice nada concreto sobre el código del piloto: lo dice F1. **Ninguna deci
 - **Contaminación**: el gold y los tests de estas tareas están publicados en internet. Para el generador están ocultos porque no tiene red, pero un modelo los pudo ver al entrenar si la tarea es anterior a su corte. De ahí que el corte de §3 sea obligatorio, y que el conjunto se renueve con los splits nuevos.
 - **Calibración (informativa)**: SWE-rebench publica el porcentaje resuelto por modelo en cada ventana, con su propio scaffold [Probable]. Si A1 se queda > 15 puntos por debajo de la cifra publicada del mismo modelo en las mismas tareas, se revisa el harness antes de leer resultados. No es un criterio de salida, porque el scaffold es distinto.
 
-### 2.2 Receta de minado de PRs fusionados (F1+, piloto, solo si S3 lo permite)
+### 2.2 Receta de minado de PRs fusionados (F1+, piloto)
 
 Se basa en el pipeline de colección de SWE-bench ([SWE-bench/SWE-bench](https://github.com/SWE-bench/SWE-bench), MIT; `swebench/collect/utils.py` y `grading.py`) [Cierto] y en SWE-rebench V2 ([arXiv 2602.23866](https://arxiv.org/abs/2602.23866); código en [SWE-rebench/SWE-rebench-V2](https://github.com/SWE-rebench/SWE-rebench-V2), MIT) [Cierto]. Cambia en los cuatro puntos marcados con ★.
 
@@ -140,7 +140,7 @@ Además, su coste medido fue de **~37,6 USD por tarea** (4 tareas reales, 44 ses
 ## 6. Ciclo de vida del conjunto de tareas
 
 - **Congelado**: las 30 tareas públicas de F0 forman el conjunto congelado v1 (M8), que se congela al terminar F0-18. **Es publicable**: el manifiesto vive en el repo y cualquiera puede reproducir la CI de la factory. No se modifican; una tarea con un defecto descubierto se retira y se registra. En F2 crece hasta ≥ 80 tareas para bajar el margen de no-inferioridad de M8 a 10 puntos ([01](01-metrics.md) §3).
-- **Rotativo**: cada split mensual nuevo de los datasets públicos alimenta el conjunto rotativo y las canarias. Desde F1, y solo si S3 lo permite, también los PRs minados del piloto.
+- **Rotativo**: cada split mensual nuevo de los datasets públicos alimenta el conjunto rotativo y las canarias. Desde F1, también los PRs minados del piloto.
 - **Caducidad del congelado**: cuando un brazo nuevo use un modelo con un corte posterior a las tareas del congelado, ese congelado deja de servir para ese brazo y se crea uno nuevo (v2) con splits posteriores.
 - **Auditoría**: cada trimestre una persona revisa 10 tareas al azar (spec, F2P y gold), siguiendo la lección de la auditoría de OpenAI sobre SWE-bench Verified ([post](https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/)).
 

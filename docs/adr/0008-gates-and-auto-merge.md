@@ -59,7 +59,7 @@ Autenticación, facturación, infraestructura, migraciones de datos y contratos 
 
 ## Consecuencias
 
-- F3 depende del volumen de la clase C1 en los repos piloto. Si el volumen no llega, F3 no ocurre: el criterio no se relaja por calendario.
+- F3 depende del volumen de la clase C1 en los repos piloto. Si el volumen no llega, F3 no ocurre: el criterio no se relaja por calendario. El propietario lo aceptó el 2026-11-01 (D3).
 - Hay que medir M4 sobre los PRs humanos desde F0, para tener baseline.
 
 ## Cómo revertir

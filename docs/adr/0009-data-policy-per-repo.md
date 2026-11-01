@@ -36,7 +36,7 @@ Se elige la 2.
 ## Consecuencias
 
 - En F0 todas las tareas son `public`. Los brazos usan solo proveedores permitidos para el piloto, para que los resultados se trasladen a F1. A2′ (Codex × OpenAI) queda descartado: OpenAI no está autorizado para el piloto (D1).
-- Hasta F1 no hace falta mirror del piloto en Hetzner ni confirmar S3 y S4.
+- Hasta F1 no hace falta mirror del piloto en Hetzner. S3 y S4 están confirmados (2026-11-01).
 - El juez de otro vendor que ve código del piloto es un modelo local, de Anthropic o de NaN. Nunca un modelo `:free` de OpenRouter.
 - Los informes publicables usan identificadores de tarea opacos.
 

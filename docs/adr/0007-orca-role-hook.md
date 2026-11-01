@@ -29,7 +29,7 @@ Excepción posible: `metrics.sh`, obra exclusiva del propietario, que él podrí
 
 - No se copia código ni prompts de orca-role-hook. Una revisión antes de cada commit lo comprueba (el hook de pre-commit no lo cubre).
 - Las ideas reutilizadas se citan con el enlace al fichero y al commit `72000c4`.
-- Si Felipe concede una licencia, se reconsidera portar `verify_task.py` (integridad), siempre que ahorre trabajo frente a la reimplementación.
+- El propietario decidió el 2026-11-01 no esperar la licencia (D2). Si Felipe la concede más adelante, se reconsidera portar `verify_task.py` (integridad), siempre que ahorre trabajo frente a la reimplementación.
 
 ## Cómo revertir
 
