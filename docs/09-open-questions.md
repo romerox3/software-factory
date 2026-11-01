@@ -46,6 +46,13 @@
 
   **Cerrado el 2026-11-01**: el propietario señala que F0 mide la factory y no el nivel de los modelos. El corte pasa de filtro a etiqueta: las comparaciones con el mismo modelo valen, y las que cruzan modelos (y el pass@1 absoluto) llevan «posible contaminación». El modelo para F1 se elige con tareas del piloto.
 
+- **El repo de una tarea real no vive en `/workspace`** (hallado el 2026-11-01 al preparar F0-17, en la imagen de una tarea de SWE-rebench) [Cierto]:
+  - El `WorkingDir` es `/testbed`, con el paquete instalado en modo editable en el entorno conda de la imagen. El runner, el sandbox del verificador y `to_harbor` montaban o dejaban el código en `/workspace`, así que los tests habrían ejecutado el código de la imagen y no el del candidato.
+  - `to_harbor` no copiaba el snapshot. El agente habría trabajado sobre `/testbed`, que trae el historial completo (T15).
+  - Arreglo (F0-17a): un campo `repo.workdir` (por defecto `/workspace`), el montaje en ese directorio, los comandos de test del dataset, el informe JUnit en un `/logs/verifier` propio de cada ejecución y un Dockerfile que hace checkout de la base y sustituye el `.git` de la imagen por el del snapshot.
+  - **Coste aceptado**: montar encima del directorio de la imagen oculta los artefactos compilados en su sitio (extensiones en C). Esas tareas dan rojo en la base y en el gold, y la revalidación las descarta (falla de forma cerrada). Se mide cuánto rendimiento se pierde en F0-17.
+  - En el `ts` de MultiLang, jest necesita `jest-junit`, que no está en las imágenes y no se puede instalar sin red. En F0 entran solo pytest y vitest: 46 tareas vitest frente a 12 jest en el split [Cierto].
+
 ## 4. Correcciones al informe de investigación (verificadas en vivo el 2026-10-31)
 
 | Dato del informe | Dato verificado |
