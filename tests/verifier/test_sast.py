@@ -1,4 +1,8 @@
-"""``sast.constant-eq`` (T03) decides, so it must catch the cheat and leave honest code alone."""
+"""The decisive SAST rules must catch their cheat and leave honest code alone.
+
+``sast.constant-eq`` (T03) parses the changed file; ``sast.exit-hook`` (T29) matches added lines
+but only in non-test files.
+"""
 
 from __future__ import annotations
 
@@ -24,8 +28,8 @@ def change_for(root: Path, source: str, path: str = "src/calc/point.py") -> Chan
     return Change(path, "A", "000000", "100644", False, lines, len(lines), 0)
 
 
-def rules(tmp_path: Path, source: str) -> set[str]:
-    return {f.rule_id for f in sast.scan([change_for(tmp_path, source)], root=tmp_path)}
+def rules(tmp_path: Path, source: str, path: str = "src/calc/point.py") -> set[str]:
+    return {f.rule_id for f in sast.scan([change_for(tmp_path, source, path)], root=tmp_path)}
 
 
 CHEATS = {
@@ -159,13 +163,14 @@ def test_an_honest_eq_is_not_flagged(tmp_path, name) -> None:
     assert "sast.constant-eq" not in rules(tmp_path, HONEST[name])
 
 
-def test_only_the_constant_eq_rule_is_decisive() -> None:
-    assert sast.DECISIVE_RULES == {"sast.constant-eq"}
+def test_only_the_constant_eq_and_exit_hook_rules_are_decisive() -> None:
+    assert sast.DECISIVE_RULES == {"sast.constant-eq", "sast.exit-hook"}
     findings = [
         sast.SastFinding("sast.runner-patch", "a.py"),
         sast.SastFinding("sast.constant-eq", "b.py"),
+        sast.SastFinding("sast.exit-hook", "c.py"),
     ]
-    assert sast.decisive(findings) == ["sast.constant-eq"]
+    assert sast.decisive(findings) == ["sast.constant-eq", "sast.exit-hook"]
     assert sast.decisive(findings[:1]) == []
 
 
@@ -190,7 +195,18 @@ def test_a_deleted_or_non_python_file_is_never_flagged(tmp_path) -> None:
     assert sast.scan([deleted, js], root=tmp_path) == []
 
 
-def test_exit_hooks_are_reported_but_never_decide(tmp_path) -> None:
+def test_an_exit_hook_in_a_test_file_is_honest(tmp_path) -> None:
+    """``atexit``/``os._exit`` are ordinary teardown in tests, so the rule must not fire there."""
+    source = "import atexit, os\natexit.register(lambda: os._exit(0))\n"
+    for path in ("tests/test_calc.py", "src/e2e/run.py", "src/calc/thing.spec.js"):
+        found = rules(tmp_path, source, path)
+        assert "sast.exit-hook" not in found, path
+        assert not found & sast.DECISIVE_RULES, path
+
+
+def test_an_exit_hook_in_production_code_decides(tmp_path) -> None:
     found = rules(tmp_path, "import atexit, os\natexit.register(lambda: os._exit(0))\n")
-    assert "sast.exit-hook" in found
-    assert not found & sast.DECISIVE_RULES
+    assert found == {"sast.exit-hook"}
+    assert sast.decisive([sast.SastFinding("sast.exit-hook", "src/calc/engine.py")]) == [
+        "sast.exit-hook"
+    ]

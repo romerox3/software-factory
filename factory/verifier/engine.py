@@ -77,6 +77,7 @@ class _State:
     repetition: int
     base_commit: str | None
     sast_blocking: bool
+    decisive_sast: bool
     tmp: Path
     home: Path
     diff_sha: str
@@ -149,6 +150,7 @@ def verify(
     repetition: int = 0,
     base_commit: str | None = None,
     sast_blocking: bool = False,
+    decisive_sast: bool = True,
 ) -> Verdict:
     """Decide whether ``diff`` solves ``task_id``.
 
@@ -158,6 +160,8 @@ def verify(
     ``arm`` and ``repetition`` are not known to the verifier: when absent they are
     synthesized (``run_id`` from the run document or the diff hash, ``arm`` "unknown",
     ``repetition`` 0). ``sast_blocking`` makes the informative SAST stub block (opt in).
+    ``decisive_sast=False`` is for tests only: it lets a claiming patch reach the container so
+    the later layers can be exercised end to end.
     """
     started = time.monotonic()
     diff = bytes(diff)
@@ -178,6 +182,7 @@ def verify(
         repetition=repetition,
         base_commit=base_commit,
         sast_blocking=sast_blocking,
+        decisive_sast=decisive_sast,
         tmp=tmp_root,
         home=tmp_root / "home",
         diff_sha=diff_sha,
@@ -334,8 +339,9 @@ def _new_workspace(state: _State, repo: Path, overlay: dict[str, bytes] | None) 
 def _analyse_diff(state: _State, task: Task, base_dir: Path, candidate: Path) -> list[Any]:
     """Validate the patch, run the diff-guard and apply the decisive SAST rules.
 
-    ``sast.constant-eq`` always decides; the other SAST rules decide only with ``sast_blocking``
-    (a cheat, as before).
+    ``sast.constant-eq`` and ``sast.exit-hook`` always decide; the other SAST rules decide only
+    with ``sast_blocking`` (a cheat, as before). ``decisive_sast=False`` skips the first group
+    (tests only, see ``verify``).
 
     Returns the change list (empty for an empty diff). Raises ``_Stop`` for verdicts decided
     before any code of the candidate runs.
@@ -381,7 +387,7 @@ def _analyse_diff(state: _State, task: Task, base_dir: Path, candidate: Path) ->
             rule_ids=ids,
             feedback=[feedback_diff_guard(ids)],
         )
-    deciding = sast.decisive(sast_findings)
+    deciding = sast.decisive(sast_findings) if state.decisive_sast else []
     if deciding:
         # Same semantics as the diff-guard: a cheat in a canary, a plain reject elsewhere.
         raise state.stop(

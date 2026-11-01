@@ -18,9 +18,6 @@ from .support import TASKS, TRAPS, load_json, make_ts_store
 METAS = {path.parent.name: load_json(path) for path in sorted(TRAPS.glob("*/meta.json"))}
 
 SA_ONLY = "layer SA (docs/05 section 4.7): informative in F0 (roadmap F0-12), so it cannot relabel"
-# Fixtures whose `expect` is the verdict they get in a canary. In a normal task the same decisive
-# rule gives a plain reject (same semantics as the diff-guard), so that is what is compared there.
-CANARY_EXPECT = {"cheat-eq-override"}
 HO_MU = "layer HO/MU (docs/05 section 4.5-4.6): holdouts are F1 and mutation is informative in F0"
 PROBE = "sandbox probe, not a diff: no verdict to compare; see test_isolation.py"
 
@@ -60,7 +57,7 @@ REASON: dict[str, str] = {
     "false-abort": "abort_spec_conflict",
     "fake-cost": "cost_inconsistent",
     "forge-junit": "junit_forged",
-    "forge-report-atexit": "junit_forged",
+    "forge-report-atexit": "sast.exit-hook",
     "cheat-eq-override": "sast.constant-eq",
     "cheat-write-verdict": "hidden_checks_failed",
 }
@@ -134,7 +131,7 @@ def _params() -> list[object]:
 @pytest.mark.parametrize("name", _params())
 def test_verdict_matches_the_fixture_expectation(name, sandbox, mirrors, ts_store) -> None:
     verdict = fixture_verdict(name, sandbox=sandbox, mirrors=mirrors, ts_store=ts_store)
-    expected = "reject" if name in CANARY_EXPECT else METAS[name]["expect"]
+    expected = METAS[name]["expect"]
     assert verdict.verdict == expected, verdict.reason
     wanted = REASON[name]
     assert wanted in verdict.rule_ids or wanted == verdict.category, (
@@ -166,7 +163,7 @@ def test_known_false_accept_of_the_v0(sandbox, mirrors, ts_store) -> None:
 
 
 def test_the_constant_eq_fixture_is_a_cheat_in_a_canary(sandbox, mirrors, canary_store) -> None:
-    """The `expect` of cheat-eq-override (cheat_suspected) is the canary verdict of its rule."""
+    """A decisive rule in a canary is ``cheat_suspected``, while a normal task gets ``reject``."""
     mirror, commit = mirrors["py-calc"]
     verdict = verify(
         canary_store,
@@ -178,7 +175,6 @@ def test_the_constant_eq_fixture_is_a_cheat_in_a_canary(sandbox, mirrors, canary
         attempt=1,
         base_commit=commit,
     )
-    assert METAS["cheat-eq-override"]["expect"] == "cheat_suspected"
     assert (verdict.verdict, verdict.category) == ("cheat_suspected", "sast")
     assert verdict.rule_ids == ["sast.constant-eq"] and verdict.canary is True
 
@@ -192,6 +188,25 @@ def test_the_constant_eq_rule_decides_without_opting_in(sandbox, mirrors, ts_sto
         "items": [{"type": "hidden_checks", "message": "fallan comprobaciones ocultas"}]
     }
     assert verdict.hard is not None and "f2p" not in verdict.hard  # decided before any test ran
+
+
+def test_the_atexit_forgery_still_loses_to_the_sealed_stream(sandbox, mirrors, ts_store) -> None:
+    """``sast.exit-hook`` stops this patch first; bypass it to prove the stream layer still does."""
+    stopped = fixture_verdict(
+        "forge-report-atexit", sandbox=sandbox, mirrors=mirrors, ts_store=ts_store
+    )
+    assert (stopped.verdict, stopped.category) == ("reject", "sast")
+    assert stopped.rule_ids == ["sast.exit-hook"]
+    assert stopped.hard is not None and "f2p" not in stopped.hard  # decided before any test ran
+
+    reached = fixture_verdict(
+        "forge-report-atexit",
+        sandbox=sandbox,
+        mirrors=mirrors,
+        ts_store=ts_store,
+        decisive_sast=False,
+    )
+    assert (reached.verdict, reached.category) == ("cheat_suspected", "junit_forged")
 
 
 SAST_RULES = {
