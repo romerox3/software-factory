@@ -24,7 +24,7 @@ F0 no dice nada concreto sobre el código del piloto: lo dice F1. **Ninguna deci
   - [`SWE-bench-Live/MultiLang`](https://huggingface.co/datasets/SWE-bench-Live/MultiLang), split `ts` (MIT): 111 tareas creadas hasta el 2026-04-20. Aporta **~10 tareas TS**.
   - Respaldo, si no hay bastantes tareas posteriores al corte: los splits mensuales siguientes que se publiquen y el split `js` de MultiLang (108).
 - **Selección**:
-  - solo tareas creadas después del **corte único** de §3;
+  - las tareas más recientes de cada fuente (sin filtro de corte en F0, §3);
   - clasificadas como C1 o C2 según el tamaño del gold (§4);
   - se descartan las de repos excluidos por clase (auth, facturación, infraestructura);
   - el muestreo es aleatorio con semilla fijada dentro de lo elegible.
@@ -36,7 +36,7 @@ F0 no dice nada concreto sobre el código del piloto: lo dice F1. **Ninguna deci
   - Las tareas con fuga en el enunciado **se descartan**, no se reescriben.
 - **Spec**: `proposal.md` es el enunciado del issue tal cual, más el campo `interface` donde lo haya. No hay reescritura humana. Se audita una muestra de 10 tareas.
 - **Lo oculto no va al repo**: el parche de tests, el gold y las listas F2P/P2P viven en el almacén del verificador. El repo solo guarda un manifiesto (`tasks/public-v1.manifest.json`) con el dataset, su revisión, los `instance_id` y los digests de las imágenes. Así el conjunto se reproduce sin redistribuir nada y se cumple la atribución de CC-BY-4.0.
-- **Contaminación**: el gold y los tests de estas tareas están publicados en internet. Para el generador están ocultos porque no tiene red, pero un modelo los pudo ver al entrenar si la tarea es anterior a su corte. De ahí que el corte de §3 sea obligatorio, y que el conjunto se renueve con los splits nuevos.
+- **Contaminación**: el gold y los tests de estas tareas están publicados en internet. Para el generador están ocultos porque no tiene red, pero un modelo los pudo ver al entrenar si la tarea es anterior a su corte. Por eso las comparaciones entre modelos distintos llevan la etiqueta de §3 y el conjunto se renueva con los splits nuevos.
 - **Calibración (informativa)**: SWE-rebench publica el porcentaje resuelto por modelo en cada ventana, con su propio scaffold [Probable]. Si A1 se queda > 15 puntos por debajo de la cifra publicada del mismo modelo en las mismas tareas, se revisa el harness antes de leer resultados. No es un criterio de salida, porque el scaffold es distinto.
 
 ### 2.2 Receta de minado de PRs fusionados (F1+, piloto)
@@ -75,7 +75,7 @@ Las tareas sintéticas se etiquetan `synthetic`, se reportan aparte y no cuentan
 
 | Vector | Riesgo en este proyecto | Control |
 |---|---|---|
-| El modelo vio el repo, el gold o los tests en su preentrenamiento | **Alto en F0** (tareas públicas); bajo en las del piloto (repos privados) [Probable] | **Obligatorio en F0**, y en el piloto solo si algún repo tuvo un espejo público: **un único corte para todos los brazos**: solo entran PRs fusionados después de la fecha más tardía de entre las fechas de corte de conocimiento declaradas por los modelos de los brazos. Si un modelo no declara su corte, se usa su **fecha de publicación**. La fecha resultante se anota en el informe |
+| El modelo vio el repo, el gold o los tests en su preentrenamiento | **Alto en F0** (tareas públicas); bajo en las del piloto (repos privados) [Probable] | **Etiqueta por comparación, no filtro** (decisión del propietario del 2026-11-01; sustituye al «corte único para todos los brazos»). F0 mide la factory: salud del arnés, verificador y efecto del ejecutor con el modelo fijo (A2 frente a A3 y A4 frente a A5), y ahí la contaminación afecta por igual a los dos brazos. Las comparaciones entre modelos distintos (A1 frente a A2, A3 frente a A4) y el pass@1 absoluto se publican con la etiqueta «posible contaminación», con las fechas: Sonnet 5.5 declara su «reliable knowledge cutoff» en junio de 2026 [Cierto, system card §1.1]; GLM-5.3 se publicó el 2026-08-25 sin corte declarado [Cierto, HF]; Qwen3.6, el 2026-04-15 [Cierto, HF]. Ninguna tarea pública es posterior a mayo de 2026 [Cierto, 2026-11-01], así que el filtro dejaba F0 sin tareas. **El modelo para F1 se elige con tareas del piloto**, que son privadas. En el piloto, el corte solo se aplica si algún repo tuvo un espejo público |
 | El agente lee la solución en el historial | Alto sin control (T15) | Snapshot fresh-init (paso 8) + prueba `leak-git-history` |
 | El agente la descarga de la red (T16) | Alto sin control | Red solo hacia el gateway |
 | El spec delata la solución | Medio: 23 % en SWE-rebench V2 [Probable] | Pasos 9 y 10 |

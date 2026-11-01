@@ -42,6 +42,10 @@
 
   **Cerrado el 2026-11-01**: después de investigar las alternativas, el propietario elige un **YAML propio con JSON Schema**. DOT se genera solo para los diagramas, y Serverless Workflow 1.0 queda como destino de traducción ([ADR-0002](adr/0002-orchestrator.md) §4).
 
+- **Corte único para todos los brazos ([06](06-harness-and-tasks.md) §3)**. El 2026-11-01, al empezar F0-17, se comprueba que ninguna tarea pública es posterior a mayo de 2026. Con el corte en junio (Sonnet 5.5) o en agosto (GLM-5.3), F0 se quedaba sin tareas.
+
+  **Cerrado el 2026-11-01**: el propietario señala que F0 mide la factory y no el nivel de los modelos. El corte pasa de filtro a etiqueta: las comparaciones con el mismo modelo valen, y las que cruzan modelos (y el pass@1 absoluto) llevan «posible contaminación». El modelo para F1 se elige con tareas del piloto.
+
 ## 4. Correcciones al informe de investigación (verificadas en vivo el 2026-10-31)
 
 | Dato del informe | Dato verificado |
