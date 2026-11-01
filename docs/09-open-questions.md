@@ -52,6 +52,12 @@
   - Arreglo (F0-17a): un campo `repo.workdir` (por defecto `/workspace`), el montaje en ese directorio, los comandos de test del dataset, el informe JUnit en un `/logs/verifier` propio de cada ejecución y un Dockerfile que hace checkout de la base y sustituye el `.git` de la imagen por el del snapshot.
   - **Coste aceptado**: montar encima del directorio de la imagen oculta los artefactos compilados en su sitio (extensiones en C). Esas tareas dan rojo en la base y en el gold, y la revalidación las descarta (falla de forma cerrada). Se mide cuánto rendimiento se pierde en F0-17.
   - En el `ts` de MultiLang, jest necesita `jest-junit`, que no está en las imágenes y no se puede instalar sin red. En F0 entran solo pytest y vitest: 46 tareas vitest frente a 12 jest en el split [Cierto].
+  - **Cerrado el 2026-11-01** (commits hasta `1296ad1`). La primera ejecución real en la torre destapó tres defectos más que los tests en macOS no veían [Cierto]:
+    - Los datasets de Hugging Face guardan cada split como `data/<split>-*.parquet`, no como carpeta.
+    - Los ficheros que el contenedor escribe como root en el directorio montado (`__pycache__`) no se pueden borrar desde el host en Linux. Ahora se pasa `PYTHONDONTWRITEBYTECODE=1` y un contenedor corto devuelve la propiedad al usuario del host tras cada ejecución.
+    - Los comandos de test de las filas ejecutan ficheros enteros que ya traen tests rotos en la base, así que el verificador rechazaba el gold (exit 1). Se resuelve con «fallos conocidos» ([05](05-verification-design.md) §4, punto 3).
+  - Aceptación sobre una tarea real de SWE-rebench (F2P 2, P2P 49, 2 fallos conocidos): el gold da `accept`, el diff vacío `reject` y un cambio ajeno al issue `reject` con F2P 0/2 [Cierto].
+  - **La recompensa de Harbor no es un veredicto en tareas reales.** La tarea de Harbor solo lleva los tests visibles, así que los F2P (tests nuevos del PR) no existen dentro del sandbox: el oracle y el agente vacío dan la misma recompensa, 0 [Cierto]. Es así por diseño ([06](06-harness-and-tasks.md) §1). La prueba pendiente de F0-13 (`harbor -a oracle` con recompensa 1) se sustituye por esta: el diff del agente, verificado por el verificador, da `accept`.
 
 ## 4. Correcciones al informe de investigación (verificadas en vivo el 2026-10-31)
 
