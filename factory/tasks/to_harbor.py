@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
+import subprocess
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 
+from factory.adapters.config import image_snippet
 from factory.tasks.import_hf import REBENCH_ENV_BIN, REBENCH_ENV_PREFIX
 from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
@@ -23,11 +27,20 @@ HIDDEN_FILE_NAMES = frozenset({"test.patch", "gold.patch", "f2p.json", "p2p.json
 SNAPSHOT_NAME = "snapshot"
 SNAPSHOT_GIT_NAME = "snapshot.git"
 
+HOSTNAME_RE = re.compile(r"[A-Za-z0-9.-]+")
 
-def to_harbor(visible_task_dir: Path, out_dir: Path) -> Path:
+
+def to_harbor(
+    visible_task_dir: Path,
+    out_dir: Path,
+    *,
+    executor: str | None = None,
+    allowed_hosts: Sequence[str] = (),
+) -> Path:
     """Write the Harbor task for ``visible_task_dir`` and return its path."""
     visible_task_dir = Path(visible_task_dir)
     out_dir = Path(out_dir)
+    hosts = _validated_hosts(allowed_hosts)
 
     task = _load_task(visible_task_dir / "factory.task.json")
     _assert_no_hidden_material(visible_task_dir)
@@ -38,7 +51,7 @@ def to_harbor(visible_task_dir: Path, out_dir: Path) -> Path:
         raise ValueError(f"output task directory already exists and is not empty: {target}")
 
     instruction = _build_instruction(visible_task_dir, task_id)
-    task_toml = _build_task_toml(task)
+    task_toml = _build_task_toml(task, hosts)
     workdir = workdir_of(task)
     snapshot = _snapshot_git(visible_task_dir)
     if snapshot is None and workdir != DEFAULT_WORKDIR:
@@ -46,8 +59,10 @@ def to_harbor(visible_task_dir: Path, out_dir: Path) -> Path:
             f"{task_id} needs {SNAPSHOT_NAME}/.git for workdir {workdir!r}: "
             "the image's own history must not reach the agent"
         )
-    dockerfile = _build_dockerfile(task, workdir, snapshot is not None)
-    test_script = _build_test_script(task["visible_tests"]["command"])
+    dockerfile = _build_dockerfile(task, workdir, snapshot is not None, executor)
+    test_script = _build_test_script(
+        task["visible_tests"]["command"], workdir, snapshot_head(visible_task_dir)
+    )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=out_dir, prefix=f".{task_id}."))
@@ -108,8 +123,15 @@ def _build_instruction(task_dir: Path, task_id: str) -> str:
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
-def _build_task_toml(task: dict[str, Any]) -> str:
+def _build_task_toml(task: dict[str, Any], allowed_hosts: Sequence[str] = ()) -> str:
     timeout_sec = task["budget"]["timeout_sec"]
+    if allowed_hosts:
+        network = (
+            'network_mode = "allowlist"\n'
+            "allowed_hosts = [" + ", ".join(f'"{host}"' for host in allowed_hosts) + "]\n"
+        )
+    else:
+        network = 'network_mode = "no-network"\n'
     return (
         'schema_version = "1.4"\n'
         "\n"
@@ -120,13 +142,15 @@ def _build_task_toml(task: dict[str, Any]) -> str:
         "timeout_sec = 120.0\n"
         "\n"
         "[environment]\n"
-        'network_mode = "no-network"\n'
+        f"{network}"
         "cpus = 1\n"
         "memory_mb = 2048\n"
     )
 
 
-def _build_dockerfile(task: dict[str, Any], workdir: str, has_snapshot: bool) -> str:
+def _build_dockerfile(
+    task: dict[str, Any], workdir: str, has_snapshot: bool, executor: str | None = None
+) -> str:
     """Real images get their history replaced by the fresh-init snapshot (T15)."""
     lines = [f"FROM {task['image']}", ""]
     if workdir != DEFAULT_WORKDIR:
@@ -136,8 +160,19 @@ def _build_dockerfile(task: dict[str, Any], workdir: str, has_snapshot: bool) ->
         lines.append(f"COPY {SNAPSHOT_GIT_NAME} {workdir}/.git")
     if task["visible_tests"]["command"].startswith(REBENCH_ENV_PREFIX):
         lines.append(f"ENV PATH={REBENCH_ENV_BIN}:$PATH")
+    if executor is not None:
+        lines.extend(image_snippet(executor))
     lines.append(f"WORKDIR {workdir}")
     return "\n".join(lines) + "\n"
+
+
+def _validated_hosts(allowed_hosts: Sequence[str]) -> tuple[str, ...]:
+    hosts: list[str] = []
+    for host in allowed_hosts:
+        if not isinstance(host, str) or not HOSTNAME_RE.fullmatch(host):
+            raise ValueError(f"not a bare hostname: {host!r}")
+        hosts.append(host)
+    return tuple(hosts)
 
 
 def _snapshot_git(task_dir: Path) -> Path | None:
@@ -146,12 +181,38 @@ def _snapshot_git(task_dir: Path) -> Path | None:
     return snapshot if snapshot.is_dir() else None
 
 
-def _build_test_script(command: str) -> str:
+def snapshot_head(task_dir: Path) -> str:
+    """Commit id of the task snapshot, or ``HEAD`` when there is no usable snapshot."""
+    snapshot = Path(task_dir) / SNAPSHOT_NAME
+    if not snapshot.is_dir():
+        return "HEAD"
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(snapshot), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return "HEAD"
+    commit = completed.stdout.strip()
+    return commit if completed.returncode == 0 and commit else "HEAD"
+
+
+def _build_test_script(command: str, workdir: str, base_commit: str) -> str:
+    checkout = shlex.quote(workdir)
+    base = shlex.quote(base_commit)
     return (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         "\n"
         "mkdir -p /logs/verifier\n"
+        "\n"
+        "if ! ("
+        f"cd {checkout} && git add -A && git diff --cached --binary {base}"
+        " > /logs/verifier/diff.patch); then\n"
+        "  : > /logs/verifier/diff.patch\n"
+        "fi\n"
         "\n"
         f"if bash -c {shlex.quote(command)}; then\n"
         "  echo 1 > /logs/verifier/reward.txt\n"

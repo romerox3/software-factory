@@ -3,12 +3,14 @@
 import json
 import os
 import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from factory.adapters import image_snippet
 from factory.tasks.import_hf import REBENCH_ENV_PREFIX
 from factory.tasks.to_harbor import to_harbor
 
@@ -250,3 +252,109 @@ def test_real_workdir_without_snapshot_is_rejected(tmp_path: Path) -> None:
         to_harbor(task_dir, tmp_path / "out")
 
     assert not (tmp_path / "out" / "demo-task").exists()
+
+
+def git_snapshot(task_dir: Path) -> str:
+    snapshot = task_dir / "snapshot"
+    snapshot.mkdir()
+    (snapshot / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(snapshot)], check=True)
+    subprocess.run(["git", "-C", str(snapshot), "add", "-A"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(snapshot),
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        check=True,
+    )
+    completed = subprocess.run(
+        ["git", "-C", str(snapshot), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return completed.stdout.strip()
+
+
+def test_executor_lines_come_after_the_snapshot_and_before_workdir(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    add_snapshot(task_dir)
+
+    generated = to_harbor(task_dir, tmp_path / "out", executor="codex")
+
+    lines = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8").splitlines()
+    snippet = image_snippet("codex")
+    start = lines.index(snippet[0])
+    assert lines[start : start + len(snippet)] == snippet
+    assert start > lines.index("COPY snapshot.git /workspace/.git")
+    assert lines[start + len(snippet)] == "WORKDIR /workspace"
+
+
+def test_no_executor_keeps_the_dockerfile_without_cli_lines(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    add_snapshot(task_dir)
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
+    assert "npm install" not in dockerfile
+
+
+def test_allowed_hosts_switch_the_network_mode_to_an_allowlist(tmp_path: Path) -> None:
+    generated = to_harbor(
+        copy_visible_task(tmp_path),
+        tmp_path / "out",
+        allowed_hosts=("gateway.example.com", "api.example.com"),
+    )
+
+    config = tomllib.loads((generated / "task.toml").read_text(encoding="utf-8"))
+    assert config["environment"] == {
+        "network_mode": "allowlist",
+        "allowed_hosts": ["gateway.example.com", "api.example.com"],
+        "cpus": 1,
+        "memory_mb": 2048,
+    }
+
+
+@pytest.mark.parametrize(
+    "host",
+    ["http://gateway", "gateway:4000", "bad host", "gate_way", ""],
+    ids=["scheme", "port", "space", "underscore", "empty"],
+)
+def test_allowed_hosts_must_be_bare_hostnames(tmp_path: Path, host: str) -> None:
+    out_dir = tmp_path / "out"
+
+    with pytest.raises(ValueError, match="hostname"):
+        to_harbor(copy_visible_task(tmp_path), out_dir, allowed_hosts=(host,))
+
+    assert not out_dir.exists()
+
+
+def test_test_script_exports_the_diff_against_the_snapshot_commit(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    commit = git_snapshot(task_dir)
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    script = (generated / "tests" / "test.sh").read_text(encoding="utf-8")
+    assert (
+        "cd /workspace && git add -A && "
+        f"git diff --cached --binary {commit} > /logs/verifier/diff.patch"
+    ) in script
+    assert script.index("diff.patch") < script.index(TASK["visible_tests"]["command"])
+    assert "echo 1 > /logs/verifier/reward.txt" in script
+
+
+def test_test_script_uses_head_without_a_snapshot(tmp_path: Path) -> None:
+    generated = to_harbor(copy_visible_task(tmp_path), tmp_path / "out")
+
+    script = (generated / "tests" / "test.sh").read_text(encoding="utf-8")
+    assert "git diff --cached --binary HEAD > /logs/verifier/diff.patch" in script

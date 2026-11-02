@@ -33,6 +33,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import jsonschema
 
@@ -48,7 +49,7 @@ from factory.adapters.output import (
 )
 from factory.adapters.prompt import prompt_sha
 from factory.gateway.client import FactoryKeysClient
-from factory.tasks.to_harbor import to_harbor
+from factory.tasks.to_harbor import snapshot_head, to_harbor
 from factory.verifier.verdict import (
     ERROR_INFRA,
     Verdict,
@@ -77,8 +78,6 @@ STREAM_FILES = {
 }
 MINI_TRAJECTORY = "mini-swe-agent.trajectory.json"
 
-GATEWAY_ROOT = GATEWAY_BASE_URL.removesuffix("/v1")
-
 
 class KeyClient(Protocol):
     """The slice of ``FactoryKeysClient`` the matrix uses."""
@@ -102,7 +101,7 @@ class Deps:
     harbor: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run
     verifier: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run
     clock: Callable[[], datetime] = _utcnow
-    to_harbor: Callable[[Path, Path], Path] = to_harbor
+    to_harbor: Callable[..., Path] = to_harbor
 
 
 @dataclass(frozen=True)
@@ -488,11 +487,12 @@ def _harbor_input(document: Mapping[str, Any]) -> dict[str, Any]:
     return {**document, "model": {"gateway_alias": alias}}
 
 
-def _harbor_command(run: PlannedRun, document: Mapping[str, Any], work: Path):
+def _harbor_command(run: PlannedRun, document: Mapping[str, Any], work: Path, gateway_url: str):
     return build_harbor_command(
         _harbor_input(document),
-        task_dir=work / "harbor" / run.task_id,
+        task_dir=work / "harbor" / run.arm.executor / run.task_id,
         jobs_dir=work / "jobs",
+        gateway_url=gateway_url,
     )
 
 
@@ -501,16 +501,19 @@ def _harbor_command(run: PlannedRun, document: Mapping[str, Any], work: Path):
 # ---------------------------------------------------------------------------
 
 
-def run_environment(executor: str, key: str, alias: str) -> dict[str, str]:
+def run_environment(
+    executor: str, key: str, alias: str, gateway_url: str = GATEWAY_BASE_URL
+) -> dict[str, str]:
     """Values for the environment names Harbor needs; never logged."""
     values: dict[str, str] = {}
+    gateway_root = gateway_url.removesuffix("/v1")
     for name in agent_config(executor).env_names:
         if name in {"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "FACTORY_GATEWAY_KEY", "MSWEA_API_KEY"}:
             values[name] = key
         elif name == "ANTHROPIC_BASE_URL":
-            values[name] = GATEWAY_ROOT
+            values[name] = gateway_root
         elif name in {"OPENAI_BASE_URL", "OPENAI_API_BASE"}:
-            values[name] = GATEWAY_BASE_URL
+            values[name] = gateway_url
         elif name == "ANTHROPIC_DEFAULT_HAIKU_MODEL":
             values[name] = alias
         elif name in {"DISABLE_AUTOUPDATER", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}:
@@ -539,7 +542,7 @@ def _execute_attempt(
 ) -> None:
     run = attempt.run
     started = deps.clock()
-    command = _harbor_command(run, attempt.input_document, args.work)
+    command = _harbor_command(run, attempt.input_document, args.work, args.gateway_url)
     key = client.mint(
         run.arm.data_class,
         float(run.arm.budget["usd"]),
@@ -552,7 +555,8 @@ def _execute_attempt(
         try:
             deps.harbor(
                 command.argv,
-                env=os.environ | run_environment(run.arm.executor, key, command.model),
+                env=os.environ
+                | run_environment(run.arm.executor, key, command.model, args.gateway_url),
                 timeout=int(run.arm.budget["wall_s"]) + HARBOR_TIMEOUT_MARGIN_S,
                 capture_output=True,
                 text=True,
@@ -638,6 +642,8 @@ def _verify(
         str(diff_path),
         "--mirror",
         str(args.store / "visible" / run.task_id / "snapshot"),
+        "--base-commit",
+        snapshot_head(args.store / "visible" / run.task_id),
         "--run",
         str(run_path),
         "--run-id",
@@ -958,12 +964,13 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
         return 0
 
     planned_tasks = sorted({run.task_id for run in plan})
+    planned_executors = sorted({run.arm.executor for run in plan})
     task_documents = {task_id: load_task_document(args.store, task_id) for task_id in planned_tasks}
 
     if args.dry_run:
         for run in plan:
             document = build_input_document(run, args.store, task_documents[run.task_id])
-            command = _harbor_command(run, document, args.work)
+            command = _harbor_command(run, document, args.work, args.gateway_url)
             print(run.run_id)
             print(shlex.join(command.argv))
         return 0
@@ -972,7 +979,7 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
     (args.out / "verdicts").mkdir(parents=True, exist_ok=True)
     client, owns_client = _key_client(deps)
     try:
-        converted, conversion_errors = _convert_tasks(planned_tasks, args, deps)
+        converted, conversion_errors = _convert_tasks(planned_tasks, planned_executors, args, deps)
         semaphores = {
             provider: threading.Semaphore(limit) for provider, limit in matrix.providers.items()
         }
@@ -1017,18 +1024,30 @@ def _key_client(deps: Deps) -> tuple[KeyClient, bool]:
 
 
 def _convert_tasks(
-    task_ids: Sequence[str], args: argparse.Namespace, deps: Deps
-) -> tuple[dict[str, Path], dict[str, str]]:
-    converted: dict[str, Path] = {}
-    errors: dict[str, str] = {}
-    for task_id in task_ids:
-        target = args.work / "harbor" / task_id
-        try:
-            if not (target.is_dir() and any(target.iterdir())):
-                deps.to_harbor(args.store / "visible" / task_id, args.work / "harbor")
-            converted[task_id] = target
-        except Exception as exc:  # noqa: BLE001 - one bad task must not abort the matrix
-            errors[task_id] = f"{type(exc).__name__}: {exc}"
+    task_ids: Sequence[str],
+    executors: Sequence[str],
+    args: argparse.Namespace,
+    deps: Deps,
+) -> tuple[dict[tuple[str, str], Path], dict[tuple[str, str], str]]:
+    converted: dict[tuple[str, str], Path] = {}
+    errors: dict[tuple[str, str], str] = {}
+    hosts = (args.gateway_host,)
+    for executor in executors:
+        harbor_dir = args.work / "harbor" / executor
+        for task_id in task_ids:
+            key = (executor, task_id)
+            target = harbor_dir / task_id
+            try:
+                if not (target.is_dir() and any(target.iterdir())):
+                    deps.to_harbor(
+                        args.store / "visible" / task_id,
+                        harbor_dir,
+                        executor=executor,
+                        allowed_hosts=hosts,
+                    )
+                converted[key] = target
+            except Exception as exc:  # noqa: BLE001 - one bad task must not abort the matrix
+                errors[key] = f"{type(exc).__name__}: {exc}"
     return converted, errors
 
 
@@ -1039,16 +1058,17 @@ def _run_one(
     deps: Deps,
     client: KeyClient,
     semaphores: Mapping[str, threading.Semaphore],
-    converted: Mapping[str, Path],
-    conversion_errors: Mapping[str, str],
+    converted: Mapping[tuple[str, str], Path],
+    conversion_errors: Mapping[tuple[str, str], str],
 ) -> None:
     semaphore = semaphores[run.arm.provider]
     holder: dict[str, Any] = {}
+    key = (run.arm.executor, run.task_id)
     with semaphore:
         try:
-            if run.task_id in conversion_errors:
-                raise RuntimeError(conversion_errors[run.task_id])
-            if run.task_id not in converted:
+            if key in conversion_errors:
+                raise RuntimeError(conversion_errors[key])
+            if key not in converted:
                 raise RuntimeError(f"harbor task for {run.task_id} was not converted")
             document = build_input_document(run, args.store, task)
             attempt = _Attempt(
@@ -1171,6 +1191,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--task", action="append", default=[])
     run.add_argument("--k", type=int)
     run.add_argument("--dry-run", action="store_true")
+    run.add_argument(
+        "--gateway-url",
+        default=os.environ.get("FACTORY_GATEWAY_URL"),
+        help="gateway base URL (default: $FACTORY_GATEWAY_URL)",
+    )
 
     check = subparsers.add_parser("check", help="enforce the F0-18 gate")
     check.add_argument("root", type=Path)
@@ -1188,6 +1213,24 @@ def main(argv: Sequence[str] | None = None, *, deps: Deps | None = None) -> int:
         if args.k is not None and args.k < 1:
             print("--k must be >= 1", file=sys.stderr)
             return 2
+        gateway_url = args.gateway_url or os.environ.get("FACTORY_GATEWAY_URL")
+        if not gateway_url:
+            if not args.dry_run:
+                print(
+                    "--gateway-url or FACTORY_GATEWAY_URL is required for run",
+                    file=sys.stderr,
+                )
+                return 2
+            gateway_url = GATEWAY_BASE_URL
+        try:
+            host = urlsplit(gateway_url).hostname
+        except ValueError:
+            host = None
+        if not host:
+            print(f"invalid --gateway-url: {gateway_url!r}", file=sys.stderr)
+            return 2
+        args.gateway_url = gateway_url
+        args.gateway_host = host
         for name in ("store", "arms", "out", "work"):
             setattr(args, name, getattr(args, name).resolve())
         return _run_command(args, deps)

@@ -27,12 +27,26 @@ from .support import (
     FakeHarbor,
     FakeKeys,
     FakeVerifier,
+    add_git_snapshot,
     arm,
     write_arms,
     write_run_doc,
     write_store,
     write_verdict_doc,
 )
+
+
+class RecordingToHarbor:
+    """Records conversions instead of writing a real Harbor task."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Path, Path, dict[str, object]]] = []
+
+    def __call__(self, visible_task_dir: Path, out_dir: Path, **kwargs: object) -> Path:
+        self.calls.append((Path(visible_task_dir), Path(out_dir), kwargs))
+        target = Path(out_dir) / Path(visible_task_dir).name
+        target.mkdir(parents=True, exist_ok=True)
+        return target
 
 
 def _deps(
@@ -59,6 +73,8 @@ def _run_args(store: Path, arms: Path, out: Path, work: Path, *extra: str) -> li
         str(out),
         "--work",
         str(work),
+        "--gateway-url",
+        "http://gateway:4000/v1",
         *extra,
     ]
 
@@ -334,6 +350,132 @@ def test_no_key_value_is_written_or_printed(
         for path in root.rglob("*"):
             if path.is_file():
                 assert secret not in path.read_text(encoding="utf-8", errors="replace")
+
+
+# ---------------------------------------------------------------------------
+# Gateway URL, conversion and verifier base commit
+# ---------------------------------------------------------------------------
+
+
+def _bare_run_args(store: Path, arms: Path, out: Path, work: Path, *extra: str) -> list[str]:
+    return [
+        "run",
+        "--store",
+        str(store),
+        "--arms",
+        str(arms),
+        "--out",
+        str(out),
+        "--work",
+        str(work),
+        *extra,
+    ]
+
+
+def test_tasks_are_converted_once_per_executor_with_the_gateway_host(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(
+        tmp_path / "arms.json",
+        [
+            arm("A1", executor="claude-code"),
+            arm("A3", executor="opencode", provider="zai"),
+        ],
+        max_parallel=1,
+    )
+    work = tmp_path / "work"
+    converter = RecordingToHarbor()
+    harbor = FakeHarbor()
+    url = "http://gateway.example:4000/v1"
+
+    code = main(
+        _run_args(store, arms, tmp_path / "out", work, "--gateway-url", url),
+        deps=Deps(
+            key_client=FakeKeys(),
+            harbor=harbor,
+            verifier=FakeVerifier(),
+            to_harbor=converter,
+        ),
+    )
+
+    assert code == 0
+    assert sorted(
+        (out_dir.relative_to(work).as_posix(), kwargs["executor"], kwargs["allowed_hosts"])
+        for _visible, out_dir, kwargs in converter.calls
+    ) == [
+        ("harbor/claude-code", "claude-code", ("gateway.example",)),
+        ("harbor/opencode", "opencode", ("gateway.example",)),
+    ]
+    environments = harbor.environments
+    assert any(
+        env.get("ANTHROPIC_BASE_URL") == "http://gateway.example:4000" for env in environments
+    )
+    assert any(env.get("OPENAI_BASE_URL") == url for env in environments)
+
+
+def test_gateway_url_defaults_to_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FACTORY_GATEWAY_URL", "http://env.example:9000/v1")
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    converter = RecordingToHarbor()
+
+    code = main(
+        _bare_run_args(store, arms, tmp_path / "out", tmp_path / "work"),
+        deps=Deps(
+            key_client=FakeKeys(),
+            harbor=FakeHarbor(),
+            verifier=FakeVerifier(),
+            to_harbor=converter,
+        ),
+    )
+
+    assert code == 0
+    assert converter.calls[0][2]["allowed_hosts"] == ("env.example",)
+
+
+def test_run_without_a_gateway_url_fails_clearly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FACTORY_GATEWAY_URL", raising=False)
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json")
+
+    code = main(_bare_run_args(store, arms, tmp_path / "out", tmp_path / "work"), deps=_deps())
+
+    assert code == 2
+    assert "gateway" in capsys.readouterr().err.lower()
+
+
+def test_dry_run_does_not_require_a_gateway_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FACTORY_GATEWAY_URL", raising=False)
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)])
+
+    code = main(
+        _bare_run_args(store, arms, tmp_path / "out", tmp_path / "work", "--dry-run"),
+        deps=_deps(),
+    )
+
+    assert code == 0
+
+
+def test_verifier_gets_the_snapshot_head_as_base_commit(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    commit = add_git_snapshot(store)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    verifier = FakeVerifier()
+
+    code = main(
+        _run_args(store, arms, tmp_path / "out", tmp_path / "work"),
+        deps=_deps(verifier=verifier),
+    )
+
+    assert code == 0
+    argv = verifier.calls[0]
+    assert argv[argv.index("--base-commit") + 1] == commit
 
 
 # ---------------------------------------------------------------------------

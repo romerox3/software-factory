@@ -71,6 +71,31 @@ def test_opencode_kwargs_define_an_openai_compatible_provider() -> None:
     assert provider["options"]["apiKey"] == "{env:FACTORY_GATEWAY_KEY}"
 
 
+def test_codex_kwargs_use_the_given_gateway_url() -> None:
+    command = build_harbor_command(
+        _input("codex"),
+        task_dir="t",
+        jobs_dir="j",
+        gateway_url="http://engine.example:9000/v1",
+    )
+    raw = next(value for value in command.argv if value.startswith("config="))
+    config = json.loads(raw.split("=", 1)[1])
+    provider = config["model_providers"]["factory_gateway"]
+    assert provider["base_url"] == "http://engine.example:9000/v1"
+
+
+def test_opencode_kwargs_use_the_given_gateway_url() -> None:
+    command = build_harbor_command(
+        _input("opencode"),
+        task_dir="t",
+        jobs_dir="j",
+        gateway_url="http://engine.example:9000/v1",
+    )
+    raw = next(value for value in command.argv if value.startswith("opencode_config="))
+    config = json.loads(raw.split("=", 1)[1])
+    assert config["provider"]["openai"]["options"]["baseURL"] == "http://engine.example:9000/v1"
+
+
 def test_mini_swe_agent_kwargs_carry_the_cost_limit() -> None:
     document = _input("mini-swe-agent")
     command = build_harbor_command(document, task_dir="t", jobs_dir="j")

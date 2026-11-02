@@ -62,6 +62,37 @@ def write_store(root: Path, task_ids: Sequence[str] = (TASK_ID,)) -> Path:
     return store
 
 
+def add_git_snapshot(store: Path, task_id: str = TASK_ID) -> str:
+    """Give a visible task a real fresh-init snapshot and return its HEAD."""
+    snapshot = store / "visible" / task_id / "snapshot"
+    snapshot.mkdir()
+    (snapshot / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(snapshot)], check=True)
+    subprocess.run(["git", "-C", str(snapshot), "add", "-A"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(snapshot),
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        check=True,
+    )
+    completed = subprocess.run(
+        ["git", "-C", str(snapshot), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return completed.stdout.strip()
+
+
 def arm(
     arm_id: str,
     executor: str = "claude-code",

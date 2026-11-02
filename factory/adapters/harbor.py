@@ -30,6 +30,7 @@ def build_harbor_command(
     *,
     task_dir: str | Path,
     jobs_dir: str | Path,
+    gateway_url: str = GATEWAY_BASE_URL,
 ) -> HarborCommand:
     """Return the Harbor invocation for ``document`` (an ``executor-input``)."""
     executor = document["executor"]
@@ -56,11 +57,13 @@ def build_harbor_command(
         "--job-name",
         document["run_id"],
     ]
-    argv += _agent_kwargs(config.name, document)
+    argv += _agent_kwargs(config.name, document, gateway_url)
     return HarborCommand(argv=argv, env_names=config.env_names, model=model)
 
 
-def _agent_kwargs(name: str, document: Mapping[str, Any]) -> list[str]:
+def _agent_kwargs(
+    name: str, document: Mapping[str, Any], gateway_url: str = GATEWAY_BASE_URL
+) -> list[str]:
     executor = document["executor"]
     budget = document["budget"]
     args = ["--agent-kwarg", f"version={executor['version']}"]
@@ -80,7 +83,7 @@ def _agent_kwargs(name: str, document: Mapping[str, Any]) -> list[str]:
             "model_providers": {
                 "factory_gateway": {
                     "name": "factory-gateway",
-                    "base_url": GATEWAY_BASE_URL,
+                    "base_url": gateway_url,
                     "env_key": "FACTORY_GATEWAY_KEY",
                     "wire_api": "responses",
                 }
@@ -96,7 +99,7 @@ def _agent_kwargs(name: str, document: Mapping[str, Any]) -> list[str]:
                 "openai": {
                     "npm": "@ai-sdk/openai-compatible",
                     "options": {
-                        "baseURL": GATEWAY_BASE_URL,
+                        "baseURL": gateway_url,
                         "apiKey": "{env:FACTORY_GATEWAY_KEY}",
                     },
                 }
