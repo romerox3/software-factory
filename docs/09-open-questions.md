@@ -88,6 +88,10 @@ Lo que no se incorporó, o solo en parte:
 | #24 · A2 frente a A3 queda confundido por el puente Responses | Se declara que el puente forma parte del brazo A2 | No se puede separar: Codex solo admite `wire_api = "responses"`. El efecto del ejecutor sin puente con GLM fijo lo da A6 frente a A3 |
 | #17 · F0-02 construye el servicio de emisión aunque 02 lo condicionaba | Se quitó la condición en 02 | El revisor no pudo comprobarlo, pero el rol de *team admin* es de pago en LiteLLM (código leído en v1.86.2, `notas:conocimiento/infra/litellm-gateway-que-se-puede-hacer.md`) [Cierto], así que el servicio hace falta siempre |
 
+- **Aislamiento de los sandboxes para F1** ([ADR-0011](adr/0011-single-host-f0.md)). En F0, agentes y verificador comparten la torre y los separan el proceso y el montaje. Antes de meter código del cliente hay que decidir entre un usuario propio para el verificador, gVisor (plataforma KVM, porque la torre tiene `/dev/kvm`), Kata o una máquina aparte. Dos datos para la decisión:
+  - El modo `allowlist` de Harbor usa un sidecar con iptables, y gVisor solo soporta iptables en parte [Cierto, [compatibilidad de gVisor](https://gvisor.dev/docs/user_guide/compatibility/)]. Hay que probarlo.
+  - gVisor reduce el coste de las cargas con muchos ficheros (directfs, overlay del rootfs), pero no hay datos medidos de `npm install` ni de `pytest` [Cierto, [blog de gVisor, 2023](https://gvisor.dev/blog/2023/06/27/directfs/)]. Hay que medirlo con las tareas de F0.
+
 ## Decisiones abiertas
 
 - D1, D2 y D3 están decididas (2026-11-01, §1).

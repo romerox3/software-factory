@@ -59,6 +59,8 @@ flowchart TB
   PUB -- "PR en borrador" --> GH[(GitHub)]
 ```
 
+> **En F0 rige [ADR-0011](adr/0011-single-host-f0.md)**: el host del gateway es aarch64 y no puede ejecutar las imágenes x86_64 de las tareas, así que el verificador, el minero y el almacén oculto viven en la torre. La separación de esta sección se aplica por proceso y por montaje, no por máquina. Se revisa antes de F1.
+
 - **Dónde vive el gateway**: se reutiliza la instancia LiteLLM existente del propietario, con equipos y claves dedicados a la factory. Su host está en `factory-pilot-data`, no en este repo. Es un servidor Hetzner Cloud sin `/dev/kvm` que también aloja el verificador y servicios de otros proyectos del propietario [Cierto, comprobado el 2026-11-01]. Si la configuración de equipos o de precios choca con otros usos, se separa en una instancia propia ([ADR-0004](adr/0004-gateway.md), cómo revertir).
 - **La torre no puede llegar a los holdouts**: no tiene la deploy key, y su única ruta de red hacia el host de Hetzner es el puerto del gateway. **Todo movimiento de datos entre zonas es un pull desde Hetzner** (artefactos, trayectorias, telemetría). La torre nunca empuja nada a Hetzner.
 - **El OTel Collector vive en la torre**, en la red interna de los sandboxes junto al gateway. Recibe la telemetría de Claude Code y la escribe como JSONL en el almacén de artefactos, de donde Hetzner la recoge. Los sandboxes no tienen más ruta hacia Hetzner que el puerto del gateway.
