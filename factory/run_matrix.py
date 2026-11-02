@@ -75,6 +75,8 @@ MAX_ATTEMPTS = 3
 HARBOR_TIMEOUT_MARGIN_S = 600
 KEY_TTL_MARGIN_S = 600
 VERIFIER_TIMEOUT_S = 3600
+IMAGE_INSPECT_TIMEOUT_S = 60
+IMAGE_PULL_TIMEOUT_S = 1800
 RUN_ID_MAX = 64
 SPEND_SETTLE_S = 15.0
 DEFAULT_KEY_BUDGET_USD = 2.0
@@ -249,6 +251,7 @@ class Deps:
     key_client: KeyClient | None = None
     harbor: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run
     verifier: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run
+    docker: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run
     clock: Callable[[], datetime] = _utcnow
     to_harbor: Callable[..., Path] = to_harbor
     key_http: Callable[[str, Mapping[str, str]], tuple[int, Any]] = _gateway_get
@@ -750,6 +753,44 @@ def harbor_environment(
 # ---------------------------------------------------------------------------
 
 
+_IMAGE_LOCKS: dict[str, threading.Lock] = {}
+_IMAGE_LOCKS_GUARD = threading.Lock()
+
+
+def _image_lock(image: str) -> threading.Lock:
+    """One lock per image so parallel runs of a task share a single pull."""
+    with _IMAGE_LOCKS_GUARD:
+        return _IMAGE_LOCKS.setdefault(image, threading.Lock())
+
+
+def ensure_task_image(image: str, deps: Deps) -> None:
+    """Make ``image`` present locally, pulling it once when Docker cannot find it.
+
+    Harbor builds the agent image FROM the task image but does not leave the
+    task image tagged locally, and the verifier's sandbox never pulls (it does
+    not touch the network). Pulling here, under a per-image lock, keeps that
+    contract without pulling the same image once per parallel run.
+    """
+    with _image_lock(image):
+        present = deps.docker(
+            ["docker", "image", "inspect", image],
+            capture_output=True,
+            text=True,
+            timeout=IMAGE_INSPECT_TIMEOUT_S,
+        )
+        if present.returncode == 0:
+            return
+        pulled = deps.docker(
+            ["docker", "pull", image],
+            capture_output=True,
+            text=True,
+            timeout=IMAGE_PULL_TIMEOUT_S,
+        )
+        if pulled.returncode != 0:
+            detail = (pulled.stderr or pulled.stdout or "").strip()
+            raise RuntimeError(f"docker pull {image} failed: {detail[:300]}")
+
+
 def _execute_attempt(
     attempt: _Attempt, args: argparse.Namespace, deps: Deps, client: KeyClient
 ) -> None:
@@ -848,6 +889,18 @@ def _verify(
     ended: datetime,
 ) -> None:
     run = attempt.run
+    try:
+        ensure_task_image(attempt.task["image"], deps)
+    except Exception as exc:  # noqa: BLE001 - an infra failure becomes error_infra
+        _write_infra_verdict(
+            run,
+            args,
+            reason=f"{type(exc).__name__}: {exc}",
+            diff_sha=diff_sha,
+            duration_s=_wall_seconds(started, ended),
+        )
+        return
+
     out_dir = args.work / "verifier" / run.run_id
     shutil.rmtree(out_dir, ignore_errors=True)
     argv = [

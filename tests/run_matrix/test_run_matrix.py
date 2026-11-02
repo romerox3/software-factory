@@ -28,6 +28,7 @@ from .support import (
     FIXTURES,
     KEY,
     TASK_ID,
+    FakeDocker,
     FakeHarbor,
     FakeKeys,
     FakeVerifier,
@@ -59,11 +60,13 @@ def _deps(
     keys: FakeKeys | None = None,
     harbor: FakeHarbor | None = None,
     verifier: FakeVerifier | None = None,
+    docker: FakeDocker | None = None,
 ) -> Deps:
     return Deps(
         key_client=keys or FakeKeys(),
         harbor=harbor or FakeHarbor(),
         verifier=verifier or FakeVerifier(),
+        docker=docker or FakeDocker(),
     )
 
 
@@ -492,6 +495,98 @@ def test_verifier_that_writes_nothing_becomes_error_infra(tmp_path: Path) -> Non
     assert "no verdict" in verdict["reason"]
 
 
+# ---------------------------------------------------------------------------
+# Task image availability
+# ---------------------------------------------------------------------------
+
+
+def _task_image(store: Path) -> str:
+    task = json.loads((store / "visible" / TASK_ID / "factory.task.json").read_text())
+    return task["image"]
+
+
+def test_present_task_image_is_not_pulled(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    docker = FakeDocker(present=True)
+    verifier = FakeVerifier()
+
+    code = main(
+        _run_args(store, arms, tmp_path / "out", tmp_path / "work"),
+        deps=_deps(docker=docker, verifier=verifier),
+    )
+
+    assert code == 0
+    assert docker.inspects == [_task_image(store)]
+    assert docker.pulls == []
+    assert len(verifier.calls) == 1
+
+
+def test_missing_task_image_is_pulled_once_before_verifying(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    events: list[str] = []
+    docker = FakeDocker(present=False, events=events)
+    verifier = FakeVerifier(events=events)
+
+    code = main(
+        _run_args(store, arms, tmp_path / "out", tmp_path / "work"),
+        deps=_deps(docker=docker, verifier=verifier),
+    )
+
+    assert code == 0
+    assert docker.pulls == [_task_image(store)]
+    assert events == ["inspect", "pull", "verify"]
+
+
+def test_parallel_runs_of_one_task_pull_the_image_once(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=2)], max_parallel=2)
+    docker = FakeDocker(present=False, pull_delay=0.05)
+    verifier = FakeVerifier()
+
+    code = main(
+        _run_args(store, arms, tmp_path / "out", tmp_path / "work"),
+        deps=_deps(docker=docker, harbor=FakeHarbor(delay=0.02), verifier=verifier),
+    )
+
+    assert code == 0
+    assert docker.pulls == [_task_image(store)]
+    assert len(verifier.calls) == 2
+
+
+def test_failed_pull_is_error_infra_and_retried(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    work = tmp_path / "work"
+    verifier = FakeVerifier()
+
+    code = main(
+        _run_args(store, arms, out, work),
+        deps=_deps(docker=FakeDocker(present=False, fail_pull=True), verifier=verifier),
+    )
+
+    assert code == 0
+    assert verifier.calls == []
+    verdict = json.loads((out / "verdicts" / "a1-demo-task-r1-a1.json").read_text())
+    assert verdict["verdict"] == "error_infra"
+    assert "docker pull" in verdict["reason"]
+    assert "pull access denied" in verdict["reason"]
+
+    retried_verifier = FakeVerifier()
+    code = main(
+        _run_args(store, arms, out, work),
+        deps=_deps(docker=FakeDocker(present=False), verifier=retried_verifier),
+    )
+
+    assert code == 0
+    assert retried_verifier.calls
+    retried = json.loads((out / "verdicts" / "a1-demo-task-r1-a2.json").read_text())
+    assert retried["attempt"] == 2
+    assert retried["verdict"] == "reject"
+
+
 def test_no_key_value_is_written_or_printed(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -560,6 +655,7 @@ def test_tasks_are_converted_once_per_executor_with_the_gateway_host(tmp_path: P
             harbor=harbor,
             verifier=FakeVerifier(),
             to_harbor=converter,
+            docker=FakeDocker(),
         ),
     )
 
@@ -593,6 +689,7 @@ def test_gateway_url_defaults_to_the_environment(
             harbor=FakeHarbor(),
             verifier=FakeVerifier(),
             to_harbor=converter,
+            docker=FakeDocker(),
         ),
     )
 

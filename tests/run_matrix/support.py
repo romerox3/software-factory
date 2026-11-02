@@ -251,16 +251,70 @@ def _provider_of(argv: Sequence[str]) -> str:
     return "anthropic"
 
 
+class FakeDocker:
+    """Answers ``docker image inspect`` / ``docker pull`` without Docker."""
+
+    def __init__(
+        self,
+        *,
+        present: bool = True,
+        fail_pull: bool = False,
+        pull_delay: float = 0.0,
+        events: list[str] | None = None,
+    ) -> None:
+        self.present = present
+        self.fail_pull = fail_pull
+        self.pull_delay = pull_delay
+        self.events = events
+        self.inspects: list[str] = []
+        self.pulls: list[str] = []
+        self._lock = threading.Lock()
+
+    def __call__(self, argv: Sequence[str], **_kwargs: Any) -> subprocess.CompletedProcess[Any]:
+        image = argv[-1]
+        if list(argv[1:3]) == ["image", "inspect"]:
+            with self._lock:
+                self.inspects.append(image)
+                present = self.present
+            if self.events is not None:
+                self.events.append("inspect")
+            if present:
+                return subprocess.CompletedProcess(list(argv), 0, "[]", "")
+            return subprocess.CompletedProcess(list(argv), 1, "", f"No such image: {image}")
+        if list(argv[1:2]) == ["pull"]:
+            with self._lock:
+                self.pulls.append(image)
+            if self.events is not None:
+                self.events.append("pull")
+            if self.pull_delay:
+                time.sleep(self.pull_delay)
+            if self.fail_pull:
+                return subprocess.CompletedProcess(list(argv), 1, "", "pull access denied")
+            with self._lock:
+                self.present = True
+            return subprocess.CompletedProcess(list(argv), 0, "pulled", "")
+        raise AssertionError(f"unexpected docker command: {list(argv)}")
+
+
 class FakeVerifier:
     """Writes a schema-valid verdict instead of running Docker."""
 
-    def __init__(self, verdict: str = "reject", *, write: bool = True) -> None:
+    def __init__(
+        self,
+        verdict: str = "reject",
+        *,
+        write: bool = True,
+        events: list[str] | None = None,
+    ) -> None:
         self.verdict = verdict
         self.write = write
+        self.events = events
         self.calls: list[list[str]] = []
 
     def __call__(self, argv: Sequence[str], **_kwargs: Any) -> subprocess.CompletedProcess[Any]:
         self.calls.append(list(argv))
+        if self.events is not None:
+            self.events.append("verify")
         if not self.write:
             return subprocess.CompletedProcess(list(argv), 20, "", "")
         out_dir = Path(argv[argv.index("--out-dir") + 1])
