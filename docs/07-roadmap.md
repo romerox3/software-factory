@@ -18,7 +18,7 @@
 
 | Tipo | Criterio | Cómo se mide |
 |---|---|---|
-| **Salida** | ≥ 15 tareas válidas (zona intermedia de la antigua F0 aceptada). Las TS se intentan con un tope de 1 día; si no salen ≥ 8, el informe declara que la etapa solo está medida en Python | Inventario del almacén |
+| **Salida** | ≥ 15 tareas válidas (zona intermedia de la antigua F0 aceptada). Las TS se intentan con un tope de 1 día (decisión del 2026-11-02); si no salen ≥ 8, el informe declara que la etapa solo está medida en Python | Inventario del almacén |
 | **Salida** (salud del harness) | ≥ 95 % de las ejecuciones producen una salida de contrato válida y `error_infra` ≤ 5 % (cada `error_infra` se repite hasta 2 veces) | `check-jsonschema` sobre `runs/` |
 | **Salida** | Verificador reproducible: ≥ 99 % de veredictos idénticos al repetir 100 veredictos al azar | Reverificación |
 | **Salida** | **Falsos `accept`**: ≤ 1 en una auditoría de 30 `accept` al azar, y ≥ 9/10 en 10 `reject`/`cheat_suspected` | Hoja de auditoría |
@@ -30,7 +30,7 @@
 
 - **Objetivo**: que la factory construya una app web interna desde cero (login, formularios, listados, flujos de negocio) a partir de una spec aprobada, la despliegue en staging y la compruebe con escenarios ocultos. Cubre E2, E3, E4, E5 y E7 en staging.
 - **Por qué antes que el piloto**: no necesita código del cliente, prueba la parte nueva más arriesgada (el oráculo de producto) y es lo que más se parece a «construir cualquier software».
-- **Material**: 5 specs de apps internas pequeñas escritas por el orquestador y aprobadas por el propietario, más la app interna real que elija el propietario. Las specs de [Vibe Code Bench](https://arxiv.org/abs/2603.04601) no son públicas [Probable], así que no hay conjunto externo con el que calibrar.
+- **Material**: 5 specs de apps internas pequeñas escritas por el orquestador y aprobadas por el propietario, más una app real: **el frontend de la propia factory** (decisión del 2026-11-02). Se construye contra un contrato de API con datos de prueba, para no depender de la fase C, y se conecta a la API real cuando exista. Las specs de [Vibe Code Bench](https://arxiv.org/abs/2603.04601) no son públicas [Probable], así que no hay conjunto externo con el que calibrar.
 - **Duración estimada**: 4–6 semanas [Suposición].
 
 | Tipo | Criterio | Cómo se mide |
@@ -127,7 +127,7 @@ Se detalla como specs despachables cuando la fase A cierre. Las piezas, en orden
 
 | ID | Pieza | Quién |
 |---|---|---|
-| B-01 | Elegir la app interna real y escribir las 5 specs de apps pequeñas con sus escenarios visibles | Orquestador + aprobación del propietario |
+| B-01 | Escribir la spec de la app real (el **frontend de la propia factory**: trabajo en curso, puertas humanas, veredictos y métricas; decisión del 2026-11-02) contra un contrato de API con datos de prueba, y las 5 specs de apps pequeñas, todas con sus escenarios visibles | Orquestador + aprobación del propietario |
 | B-02 | Perfil app web: entorno (app + base de datos en contenedores), despliegue en staging en la torre y contrato del perfil ([06](06-harness-and-tasks.md) §7) | Sonnet (diseño) + peones |
 | B-03 | Escritor de escenarios ocultos: un proceso aparte que, a partir de la spec aprobada, escribe escenarios que el constructor nunca ve | Sonnet + revisión del orquestador |
 | B-04 | Ejecutor de escenarios: agente de navegador sobre la app desplegada, con veredicto por paso | Sonnet + peones |
@@ -137,7 +137,6 @@ Se detalla como specs despachables cuando la fase A cierre. Las piezas, en orden
 
 ## Decisiones abiertas
 
-- Qué app web interna real se usa en la fase B.
 - Si el ejecutor de escenarios es un agente de navegador (como Vibe Code Bench) o scripts deterministas; se decide con los datos de B-04 y B-05.
 - Qué perfil va después de app web (fase D).
 - Si la fase C empieza con issues sueltos o con una épica.

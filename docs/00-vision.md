@@ -85,4 +85,3 @@ Cada umbral tiene fórmula, fuente y tamaño de muestra en [01-metrics](01-metri
 - El umbral de la canaria (≤ 2 %) y el de mantenibilidad son hipótesis. Se recalibran con los datos de las fases A y C ([09](09-open-questions.md)).
 - Las métricas de producto (M9, M10) se definen en la fase B ([07](07-roadmap.md)).
 - Qué perfil va después de app web ([10](10-rediseno-propuesta.md)).
-- Qué app web interna concreta se usa en la fase B.
