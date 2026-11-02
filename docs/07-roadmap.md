@@ -79,7 +79,7 @@
 
 ## 2. Backlog de la fase A (antes «F0»)
 
-Los identificadores `F0-NN` se mantienen. Estado a 2026-11-02: F0-01 a F0-16 y F0-21 hechas; F0-17 con 28 tareas válidas (26 Python y 2 TS) y la revalidación de enero en curso; F0-18 a F0-20 pendientes.
+Los identificadores `F0-NN` se mantienen. Estado a 2026-11-02: F0-01 a F0-17 y F0-21 hechas; F0-18 en curso (programa de la matriz); F0-19 y F0-20 pendientes. El conjunto v1 (`tasks/public-v1.manifest.json`) tiene 35 tareas Python de SWE-rebench (enero a marzo de 2026): de 39 válidas en la revalidación, se quitan 4 cuyo parche gold no acepta el verificador (una sin informe JUnit y tres falsos `cheat_suspected` del flujo de resultados, pendientes de investigar). TS queda fuera de v1: tras el tope de un día, 3 tareas pasaban la revalidación pero ninguna funciona en el sandbox del verificador (corepack sin red, copia del almacén de pnpm); pasa a la fase D.
 
 **Convenciones de despacho** (ver [CLAUDE.md](../CLAUDE.md)):
 - **Peón**: OpenCode con GLM o DeepSeek a través del gateway, en un worktree aislado. Recibe la spec tal cual. Nunca recibe datos del almacén privado: se le dan fixtures públicos.

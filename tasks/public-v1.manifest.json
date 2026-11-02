@@ -1,0 +1,291 @@
+{
+  "schema_version": "1",
+  "datasets": [
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39"
+    }
+  ],
+  "tasks": [
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "apache__iceberg-python-3295",
+      "task_id": "apache__iceberg-python-3295",
+      "image": "swerebench/sweb.eval.x86_64.apache_1776_iceberg-python-3295@sha256:10595208bda942416f6673a2629c9fb66bd5226818bbe62ce1ef99a3bef8e6d1",
+      "digest": "sha256:10595208bda942416f6673a2629c9fb66bd5226818bbe62ce1ef99a3bef8e6d1"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "avaiga__taipy-2797",
+      "task_id": "avaiga__taipy-2797",
+      "image": "swerebench/sweb.eval.x86_64.avaiga_1776_taipy-2797@sha256:c0a53b21b1a867b2571a6ea5796cb1261dcb4eefff915d1ff6378408410be8e7",
+      "digest": "sha256:c0a53b21b1a867b2571a6ea5796cb1261dcb4eefff915d1ff6378408410be8e7"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "aws-cloudformation__cfn-python-lint-4368",
+      "task_id": "aws-cloudformation__cfn-python-lint-4368",
+      "image": "swerebench/sweb.eval.x86_64.aws-cloudformation_1776_cfn-python-lint-4368@sha256:32b8116c42d80d1acf31e83d3dce7547c13a5ba78bfe0b39037acb6331137c31",
+      "digest": "sha256:32b8116c42d80d1acf31e83d3dce7547c13a5ba78bfe0b39037acb6331137c31"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "cs-si__eodag-2176",
+      "task_id": "cs-si__eodag-2176",
+      "image": "swerebench/sweb.eval.x86_64.cs-si_1776_eodag-2176@sha256:abdf3c8dd48ac05e351489c400a6b9625beeb2d2eda641b84056151d88cb0dfb",
+      "digest": "sha256:abdf3c8dd48ac05e351489c400a6b9625beeb2d2eda641b84056151d88cb0dfb"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "gammapy__gammapy-6409",
+      "task_id": "gammapy__gammapy-6409",
+      "image": "swerebench/sweb.eval.x86_64.gammapy_1776_gammapy-6409@sha256:c50b4d96568a3a8de4e3d03a80b87fb6f9a70b8edcd5191aba0099f14cf68043",
+      "digest": "sha256:c50b4d96568a3a8de4e3d03a80b87fb6f9a70b8edcd5191aba0099f14cf68043"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "genericmappingtools__pygmt-4342",
+      "task_id": "genericmappingtools__pygmt-4342",
+      "image": "swerebench/sweb.eval.x86_64.genericmappingtools_1776_pygmt-4342@sha256:b33d962e33e49a437f15e667758b7ef11081990b9c1cc94753bf9c2f1ed61b8c",
+      "digest": "sha256:b33d962e33e49a437f15e667758b7ef11081990b9c1cc94753bf9c2f1ed61b8c"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "holoviz__holoviews-6783",
+      "task_id": "holoviz__holoviews-6783",
+      "image": "swerebench/sweb.eval.x86_64.holoviz_1776_holoviews-6783@sha256:cf70e90c32b107c16d7bea24e6dfa2b9a24680acadf283951cf309d4fd2ff028",
+      "digest": "sha256:cf70e90c32b107c16d7bea24e6dfa2b9a24680acadf283951cf309d4fd2ff028"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "huggingface__huggingface_hub-4056",
+      "task_id": "huggingface__huggingface_hub-4056",
+      "image": "swerebench/sweb.eval.x86_64.huggingface_1776_huggingface_hub-4056@sha256:cbfae263dff792cc7c763057905869c548bf37733352ff999b3d7d4278c87677",
+      "digest": "sha256:cbfae263dff792cc7c763057905869c548bf37733352ff999b3d7d4278c87677"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "jlowin__fastmcp-3237_interface",
+      "task_id": "jlowin__fastmcp-3237_interface",
+      "image": "swerebench/sweb.eval.x86_64.jlowin_1776_fastmcp-3237_interface@sha256:04bf337bf6685d4dd97b53765accb98ef42f54b3c2c00a108e41128590c7ab55",
+      "digest": "sha256:04bf337bf6685d4dd97b53765accb98ef42f54b3c2c00a108e41128590c7ab55"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "jsonpickle__jsonpickle-588",
+      "task_id": "jsonpickle__jsonpickle-588",
+      "image": "swerebench/sweb.eval.x86_64.jsonpickle_1776_jsonpickle-588@sha256:0eae843824198c5cfb0b6bb25b5c9b50c1b415ea7295867a314a3a8ce65c7fb4",
+      "digest": "sha256:0eae843824198c5cfb0b6bb25b5c9b50c1b415ea7295867a314a3a8ce65c7fb4"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "keras-team__keras-22138",
+      "task_id": "keras-team__keras-22138",
+      "image": "swerebench/sweb.eval.x86_64.keras-team_1776_keras-22138@sha256:33c0a55769ca939a6ad4c197f2220a7980a6d898ebf656e16d3702879b81a443",
+      "digest": "sha256:33c0a55769ca939a6ad4c197f2220a7980a6d898ebf656e16d3702879b81a443"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "koxudaxi__datamodel-code-generator-2996",
+      "task_id": "koxudaxi__datamodel-code-generator-2996",
+      "image": "swerebench/sweb.eval.x86_64.koxudaxi_1776_datamodel-code-generator-2996@sha256:aece8b5b9fedd6909c957226c9df1f85951f6d0370fe77281f71af8b8bf60626",
+      "digest": "sha256:aece8b5b9fedd6909c957226c9df1f85951f6d0370fe77281f71af8b8bf60626"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "koxudaxi__datamodel-code-generator-2998",
+      "task_id": "koxudaxi__datamodel-code-generator-2998",
+      "image": "swerebench/sweb.eval.x86_64.koxudaxi_1776_datamodel-code-generator-2998@sha256:fa009aa369191837f59a3b72fbbf77cc172379e6df0f8f4df7fdd55070254701",
+      "digest": "sha256:fa009aa369191837f59a3b72fbbf77cc172379e6df0f8f4df7fdd55070254701"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "koxudaxi__datamodel-code-generator-3046",
+      "task_id": "koxudaxi__datamodel-code-generator-3046",
+      "image": "swerebench/sweb.eval.x86_64.koxudaxi_1776_datamodel-code-generator-3046@sha256:77fe48867b411d845cbfe4b02ab159f3bb81710c1f0047a31b37a7b3548e575a",
+      "digest": "sha256:77fe48867b411d845cbfe4b02ab159f3bb81710c1f0047a31b37a7b3548e575a"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "marimo-team__marimo-8401",
+      "task_id": "marimo-team__marimo-8401",
+      "image": "swerebench/sweb.eval.x86_64.marimo-team_1776_marimo-8401@sha256:a67454580e3e9faba01292cd62833002e3ee08ea0a6e121e72372e433a80d7cd",
+      "digest": "sha256:a67454580e3e9faba01292cd62833002e3ee08ea0a6e121e72372e433a80d7cd"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "meltano__meltano-9929",
+      "task_id": "meltano__meltano-9929",
+      "image": "swerebench/sweb.eval.x86_64.meltano_1776_meltano-9929@sha256:3ecc39249a32afc5644386f75b81852384aa9dfaf9b306a18195ebb0b8bc17bb",
+      "digest": "sha256:3ecc39249a32afc5644386f75b81852384aa9dfaf9b306a18195ebb0b8bc17bb"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "narwhals-dev__narwhals-3478",
+      "task_id": "narwhals-dev__narwhals-3478",
+      "image": "swerebench/sweb.eval.x86_64.narwhals-dev_1776_narwhals-3478@sha256:33f5e8a66ea9235065c44c2c2fe5fff3fa1f35c375d028832c6f6262ea321764",
+      "digest": "sha256:33f5e8a66ea9235065c44c2c2fe5fff3fa1f35c375d028832c6f6262ea321764"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "narwhals-dev__narwhals-3480",
+      "task_id": "narwhals-dev__narwhals-3480",
+      "image": "swerebench/sweb.eval.x86_64.narwhals-dev_1776_narwhals-3480@sha256:08a4130c2ef18cd9a4eaa5aa96bbd617ad217f758924e8aad6474f1be9db024a",
+      "digest": "sha256:08a4130c2ef18cd9a4eaa5aa96bbd617ad217f758924e8aad6474f1be9db024a"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "newton-physics__newton-1582",
+      "task_id": "newton-physics__newton-1582",
+      "image": "swerebench/sweb.eval.x86_64.newton-physics_1776_newton-1582@sha256:94fe09e46954bc6bf508082234b141a2203a395a699c2bc1d1bd7d1859210374",
+      "digest": "sha256:94fe09e46954bc6bf508082234b141a2203a395a699c2bc1d1bd7d1859210374"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "nolar__kopf-1225",
+      "task_id": "nolar__kopf-1225",
+      "image": "swerebench/sweb.eval.x86_64.nolar_1776_kopf-1225@sha256:c9344b122a31dcb189ab83598c2e3998441caecc716858bbb4cd221ec3ae4724",
+      "digest": "sha256:c9344b122a31dcb189ab83598c2e3998441caecc716858bbb4cd221ec3ae4724"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "open-telemetry__opentelemetry-python-4891",
+      "task_id": "open-telemetry__opentelemetry-python-4891",
+      "image": "swerebench/sweb.eval.x86_64.open-telemetry_1776_opentelemetry-python-4891@sha256:ff4a6c54752af28ca6425add0c91418bc470669b749a5106c3b34f3bf693a59b",
+      "digest": "sha256:ff4a6c54752af28ca6425add0c91418bc470669b749a5106c3b34f3bf693a59b"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "opsmill__infrahub-8407",
+      "task_id": "opsmill__infrahub-8407",
+      "image": "swerebench/sweb.eval.x86_64.opsmill_1776_infrahub-8407@sha256:25e140d3fe4a01654ff3421263be38c207335a39c016567cd6e5ca8ee9752a6d",
+      "digest": "sha256:25e140d3fe4a01654ff3421263be38c207335a39c016567cd6e5ca8ee9752a6d"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "opsmill__infrahub-8423",
+      "task_id": "opsmill__infrahub-8423",
+      "image": "swerebench/sweb.eval.x86_64.opsmill_1776_infrahub-8423@sha256:ae2a5e2f7ca8227c2678ea0beff9863b032dc9fe5d68e5795b13fa4064fc3de3",
+      "digest": "sha256:ae2a5e2f7ca8227c2678ea0beff9863b032dc9fe5d68e5795b13fa4064fc3de3"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "pipecat-ai__pipecat-4283",
+      "task_id": "pipecat-ai__pipecat-4283",
+      "image": "swerebench/sweb.eval.x86_64.pipecat-ai_1776_pipecat-4283@sha256:a1d83525e3bc633544b04f43643ef6f250504f9ca7d1c811f67adbdb928142cd",
+      "digest": "sha256:a1d83525e3bc633544b04f43643ef6f250504f9ca7d1c811f67adbdb928142cd"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "psd-tools__psd-tools-551",
+      "task_id": "psd-tools__psd-tools-551",
+      "image": "swerebench/sweb.eval.x86_64.psd-tools_1776_psd-tools-551@sha256:54a443c87264969c569095d4d1b2b59351b99e30df82ef21360843e5f8b9efa9",
+      "digest": "sha256:54a443c87264969c569095d4d1b2b59351b99e30df82ef21360843e5f8b9efa9"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "psd-tools__psd-tools-593",
+      "task_id": "psd-tools__psd-tools-593",
+      "image": "swerebench/sweb.eval.x86_64.psd-tools_1776_psd-tools-593@sha256:eb1277e5cc12e3f6986b35ac1d4e454f4c7679b2bd078d4598db38b2f9fc6838",
+      "digest": "sha256:eb1277e5cc12e3f6986b35ac1d4e454f4c7679b2bd078d4598db38b2f9fc6838"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "pydap__pydap-624",
+      "task_id": "pydap__pydap-624",
+      "image": "swerebench/sweb.eval.x86_64.pydap_1776_pydap-624@sha256:2754bdaec1600f165fde35d6c7bf231f2fb0c3b8bf940ceffc1dca95a9f5f32b",
+      "digest": "sha256:2754bdaec1600f165fde35d6c7bf231f2fb0c3b8bf940ceffc1dca95a9f5f32b"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "pyinfra-dev__pyinfra-1665",
+      "task_id": "pyinfra-dev__pyinfra-1665",
+      "image": "swerebench/sweb.eval.x86_64.pyinfra-dev_1776_pyinfra-1665@sha256:138a496547f392c77a1d472fd259e3c3fff6dd20bf5cba084335888857f395a3",
+      "digest": "sha256:138a496547f392c77a1d472fd259e3c3fff6dd20bf5cba084335888857f395a3"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "pytest-dev__pyfakefs-1269",
+      "task_id": "pytest-dev__pyfakefs-1269",
+      "image": "swerebench/sweb.eval.x86_64.pytest-dev_1776_pyfakefs-1269@sha256:02c69afcbf763a1ede2637197e0979327f7b29392f2fedeead6e2a17e8746a91",
+      "digest": "sha256:02c69afcbf763a1ede2637197e0979327f7b29392f2fedeead6e2a17e8746a91"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "python-markdown__markdown-1587",
+      "task_id": "python-markdown__markdown-1587",
+      "image": "swerebench/sweb.eval.x86_64.python-markdown_1776_markdown-1587@sha256:65a5d000f95dced254d6b5e3e348c33471f4110e5c3831f2a5ffcbff97a80e82",
+      "digest": "sha256:65a5d000f95dced254d6b5e3e348c33471f4110e5c3831f2a5ffcbff97a80e82"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "python-scim__scim2-models-120",
+      "task_id": "python-scim__scim2-models-120",
+      "image": "swerebench/sweb.eval.x86_64.python-scim_1776_scim2-models-120@sha256:a62fc935f7fd3fcde08bcf2bce08f29c9f4a25d9b222f7a2c0129e603b509b37",
+      "digest": "sha256:a62fc935f7fd3fcde08bcf2bce08f29c9f4a25d9b222f7a2c0129e603b509b37"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "python-scim__scim2-models-126",
+      "task_id": "python-scim__scim2-models-126",
+      "image": "swerebench/sweb.eval.x86_64.python-scim_1776_scim2-models-126@sha256:2919b6cc832060ae0a9ef01ffc42cd996695f79ca939d9e706cc2b2cc9bc49df",
+      "digest": "sha256:2919b6cc832060ae0a9ef01ffc42cd996695f79ca939d9e706cc2b2cc9bc49df"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "raullenchai__rapid-mlx-228",
+      "task_id": "raullenchai__rapid-mlx-228",
+      "image": "swerebench/sweb.eval.x86_64.raullenchai_1776_rapid-mlx-228@sha256:4d04e8b05b4483be4f0c178c29717e5656c1731432bf45c8e5e89c5625989228",
+      "digest": "sha256:4d04e8b05b4483be4f0c178c29717e5656c1731432bf45c8e5e89c5625989228"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "ultraplot__ultraplot-696",
+      "task_id": "ultraplot__ultraplot-696",
+      "image": "swerebench/sweb.eval.x86_64.ultraplot_1776_ultraplot-696@sha256:93adcb08a95ee7fb4a6a7451ca82160730b895e914e7a25353266785f1e51e7d",
+      "digest": "sha256:93adcb08a95ee7fb4a6a7451ca82160730b895e914e7a25353266785f1e51e7d"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "vprusso__toqito-1538",
+      "task_id": "vprusso__toqito-1538",
+      "image": "swerebench/sweb.eval.x86_64.vprusso_1776_toqito-1538@sha256:4a79ab796ad10cb18c3d805895977fbf119b16db4a9bd4b815678459846a6b86",
+      "digest": "sha256:4a79ab796ad10cb18c3d805895977fbf119b16db4a9bd4b815678459846a6b86"
+    }
+  ]
+}
