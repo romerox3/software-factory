@@ -44,11 +44,20 @@ def test_build_command_line_for_example(name: str) -> None:
     assert all("=" not in name for name in command.env_names)
 
 
-def test_claude_code_kwargs_carry_the_two_fuses() -> None:
-    document = _input("claude-code")
+@pytest.mark.parametrize("alias", ["anthropic/claude-sonnet-5-5", "claude-sonnet-5-5"])
+def test_claude_code_anthropic_models_keep_the_two_fuses(alias: str) -> None:
+    document = {**_input("claude-code"), "model": {"gateway_alias": alias}}
     command = build_harbor_command(document, task_dir="t", jobs_dir="j")
     assert "permission_mode=bypassPermissions" in command.argv
     assert f"max_budget_usd={document['budget']['usd']}" in command.argv
+    assert f"max_turns={document['budget']['max_turns']}" in command.argv
+
+
+def test_claude_code_leaves_the_budget_fuse_to_the_gateway_for_other_models() -> None:
+    document = {**_input("claude-code"), "model": {"gateway_alias": "factory/glm-5.3"}}
+    command = build_harbor_command(document, task_dir="t", jobs_dir="j")
+    assert "permission_mode=bypassPermissions" in command.argv
+    assert not any(part.startswith("max_budget_usd=") for part in command.argv)
     assert f"max_turns={document['budget']['max_turns']}" in command.argv
 
 

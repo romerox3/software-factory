@@ -79,7 +79,12 @@ def _agent_kwargs(
 
     if name == "claude-code":
         args += ["--agent-kwarg", "permission_mode=bypassPermissions"]
-        args += ["--agent-kwarg", f"max_budget_usd={budget['usd']}"]
+        # Claude Code prices the model with its own Anthropic rates, so its fuse
+        # fires far too early behind a non-Anthropic alias; the gateway key's
+        # budget is the authoritative one there.
+        alias = document["model"]["gateway_alias"]
+        if alias.startswith(("anthropic/", "claude-")):
+            args += ["--agent-kwarg", f"max_budget_usd={budget['usd']}"]
         if "max_turns" in budget:
             args += ["--agent-kwarg", f"max_turns={budget['max_turns']}"]
         return args
