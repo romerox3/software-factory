@@ -116,8 +116,8 @@ Una clase necesita **≥ 8 tareas** en el conjunto de F0 para reportarse por sep
 | **A6** | Claude Code 2.1.316 | GLM vía z.ai (`/v1/messages` de LiteLLM) | 5 | **Efecto del modelo con Claude Code fijo** (A1 frente a A6) y **efecto del ejecutor con GLM fijo** sin puente Responses (A6 frente a A3) |
 | **A2** | Codex CLI 0.166.0 | GLM vía z.ai (puente Responses de LiteLLM) | 5 | Codex **más el puente** frente a A3. Codex solo admite `wire_api = "responses"`, así que el efecto del puente no se puede separar del de Codex con GLM: forma parte del brazo |
 | **A3** | OpenCode 1.19.5 | GLM vía z.ai | 5 | **Efecto del ejecutor** con el modelo fijo (A2 frente a A3) |
-| **A4** | OpenCode 1.19.5 | Qwen local en la 5090 (clase Qwen3.6-35B-A3B, parser `qwen3_coder`) | 5 | **Efecto del modelo** con el ejecutor fijo (A3 frente a A4) |
-| **A5** | mini-swe-agent 2.4.6 | El mismo Qwen local | 5 | **Efecto del harness** con el modelo fijo (A4 frente a A5) |
+| **A4** | OpenCode 1.19.5 | Modelo local en la 5090: **Nanbeige4.3-33B** INT4 (2026-10-28, Apache 2.0; vLLM con `--reasoning-parser qwen3 --tool-call-parser qwen3_coder`), revisión fijada en F0-03 (decisión del propietario del 2026-11-02) | 5 | **Efecto del modelo** con el ejecutor fijo (A3 frente a A4) |
+| **A5** | mini-swe-agent 2.4.6 | El mismo modelo local | 5 | **Efecto del harness** con el modelo fijo (A4 frente a A5) |
 
 - **Total**: 30 × (3 + 5 × 5) = **840 ejecuciones**. En F0 no hay coste real, porque A1 usa la suscripción y los brazos de GLM el coding plan. **El límite es la cuota**:
   - A1 son 90 ejecuciones (90–270 USD a precio de lista [Suposición]) sobre la suscripción que el propietario también usa a diario.
@@ -128,7 +128,7 @@ Una clase necesita **≥ 8 tareas** en el conjunto de F0 para reportarse por sep
 - **Tiempo de pared estimado**: 2–3 días de ejecución desatendida [Suposición].
 - **Los brazos se limitan a los proveedores permitidos para el piloto** (5090, z.ai, Anthropic), aunque las tareas de F0 sean públicas, para que lo aprendido en F0 se aplique tal cual en F1.
 - **A2′ · Codex × un modelo de OpenAI**: descartado por el propietario el 2026-11-01. OpenAI tampoco está autorizado para el piloto (D1).
-- Los brazos con modelo local o de cuota usan **coste sombra**: el precio de lista de un modelo equivalente publicado por el proveedor (GLM, el precio de su API de pago; Qwen local, el precio por token de un proveedor que lo sirva), configurado en el gateway y declarado en el informe.
+- Los brazos con modelo local o de cuota usan **coste sombra**: el precio de lista de un modelo equivalente publicado por el proveedor (GLM, el precio de su API de pago; modelo local, el precio por token de un proveedor que lo sirva), configurado en el gateway y declarado en el informe.
 
 ### Por qué no está el «equipo orca-roles»
 
