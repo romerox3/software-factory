@@ -1,5 +1,7 @@
 # 07 · Roadmap
 
+> **En pausa desde el 2026-11-02.** El propietario decide rediseñar la factory entera (09 §3, «El diseño solo cubre un tramo de la factory»). Este roadmap queda como referencia hasta que lo sustituya el rediseño.
+
 > **Resumen.** Cuatro fases, cada una con un criterio de salida y un criterio de abandono medibles:
 > - **F0**: harness, ~30 tareas públicas recientes (Python y TS) y la baseline de 6 brazos. Sin datos del cliente.
 > - **F1**: verificador con holdouts y canarias, más pipeline issue→PR en borrador para C1 **sobre el piloto**.

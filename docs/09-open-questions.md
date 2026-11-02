@@ -92,6 +92,15 @@ Lo que no se incorporó, o solo en parte:
   - El modo `allowlist` de Harbor usa un sidecar con iptables, y gVisor solo soporta iptables en parte [Cierto, [compatibilidad de gVisor](https://gvisor.dev/docs/user_guide/compatibility/)]. Hay que probarlo.
   - gVisor reduce el coste de las cargas con muchos ficheros (directfs, overlay del rootfs), pero no hay datos medidos de `npm install` ni de `pytest` [Cierto, [blog de gVisor, 2023](https://gvisor.dev/blog/2023/06/27/directfs/)]. Hay que medirlo con las tareas de F0.
 
+- **El diseño solo cubre un tramo de la factory** (2026-11-02). El propietario pregunta si el diseño recoge lo que es una software factory. La investigación (`notas:conocimiento/llm-agentes/software-factory-alcance-etapas-y-productos-completos.md`) muestra que solo cubre «tarea especificada → parche verificado → PR». Faltan [Cierto, por fuente]:
+  - lo previo al código: intake, triage, spec y plan;
+  - lo posterior: despliegue con puerta, monitorización, e incidentes y feedback como tareas nuevas;
+  - la arquitectura como sensor;
+  - migraciones y seguridad como clases;
+  - los productos completos.
+
+  **Decisión del propietario (2026-11-02): F0 se para y se rediseña la factory entera**, incluida la vía de productos completos. Se conservan, por si se retoman, las 26 tareas Python ya revalidadas (almacén de la torre) y todo el código de `factory/`. El análisis de huecos está en `notas:proyectos/software-factory/analisis/huecos-de-alcance.md`.
+
 ## Decisiones abiertas
 
 - D1, D2 y D3 están decididas (2026-11-01, §1).
