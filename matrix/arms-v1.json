@@ -1,0 +1,85 @@
+{
+  "schema_version": "1",
+  "max_parallel": 3,
+  "providers": {
+    "anthropic": 3,
+    "zai": 5,
+    "local": 2
+  },
+  "arms": [
+    {
+      "id": "A1",
+      "executor": "claude-code",
+      "gateway_alias": "anthropic/claude-sonnet-5-5",
+      "data_class": "public",
+      "budget": {
+        "usd": 2.0,
+        "wall_s": 1800,
+        "max_turns": 60
+      },
+      "k": 3,
+      "provider": "anthropic"
+    },
+    {
+      "id": "A2",
+      "executor": "codex",
+      "gateway_alias": "zai/glm-5.3",
+      "data_class": "public",
+      "budget": {
+        "usd": 2.0,
+        "wall_s": 1800
+      },
+      "k": 5,
+      "provider": "zai"
+    },
+    {
+      "id": "A3",
+      "executor": "opencode",
+      "gateway_alias": "zai/glm-5.3",
+      "data_class": "public",
+      "budget": {
+        "usd": 2.0,
+        "wall_s": 1800
+      },
+      "k": 5,
+      "provider": "zai"
+    },
+    {
+      "id": "A4",
+      "executor": "opencode",
+      "gateway_alias": "local/nanbeige4.3-33b",
+      "data_class": "public",
+      "budget": {
+        "usd": 2.0,
+        "wall_s": 1800
+      },
+      "k": 5,
+      "provider": "local"
+    },
+    {
+      "id": "A5",
+      "executor": "mini-swe-agent",
+      "gateway_alias": "local/nanbeige4.3-33b",
+      "data_class": "public",
+      "budget": {
+        "usd": 2.0,
+        "wall_s": 1800
+      },
+      "k": 5,
+      "provider": "local"
+    },
+    {
+      "id": "A6",
+      "executor": "claude-code",
+      "gateway_alias": "zai/glm-5.3",
+      "data_class": "public",
+      "budget": {
+        "usd": 2.0,
+        "wall_s": 1800,
+        "max_turns": 60
+      },
+      "k": 5,
+      "provider": "zai"
+    }
+  ]
+}

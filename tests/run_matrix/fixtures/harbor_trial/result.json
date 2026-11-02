@@ -1,0 +1,15 @@
+{
+  "task_name": "demo-task",
+  "trial_name": "demo-task__fake",
+  "exception_info": null,
+  "agent_result": {
+    "n_input_tokens": 100,
+    "n_output_tokens": 20,
+    "cost_usd": 0.03
+  },
+  "verifier_result": {
+    "rewards": {
+      "reward": 1.0
+    }
+  }
+}
