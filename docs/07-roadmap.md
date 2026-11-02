@@ -79,7 +79,7 @@
 
 ## 2. Backlog de la fase A (antes «F0»)
 
-Los identificadores `F0-NN` se mantienen. Estado a 2026-11-02: F0-01 a F0-16 hechas; F0-17 con 26 tareas Python y TS pendiente; F0-18 a F0-21 pendientes.
+Los identificadores `F0-NN` se mantienen. Estado a 2026-11-02: F0-01 a F0-16 y F0-21 hechas; F0-17 con 28 tareas válidas (26 Python y 2 TS) y la revalidación de enero en curso; F0-18 a F0-20 pendientes.
 
 **Convenciones de despacho** (ver [CLAUDE.md](../CLAUDE.md)):
 - **Peón**: OpenCode con GLM o DeepSeek a través del gateway, en un worktree aislado. Recibe la spec tal cual. Nunca recibe datos del almacén privado: se le dan fixtures públicos.
