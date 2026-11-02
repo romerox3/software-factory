@@ -35,6 +35,28 @@ Cada tipo usa las etapas que necesita y gana su autonomía por separado:
 | **Épica** | Feature grande en un producto existente | Escenarios ocultos de la épica | **Nueva**: recorre E2–E7 |
 | **Producto nuevo** | **App web interna** (login, formularios, listados, flujos) | **Recorridos de usuario ocultos que ejecuta un agente de navegador sobre la app desplegada** | **Nueva** |
 
+## 3 bis. Cualquier tipo de software: perfiles
+
+La factory tiene que servir para construir **cualquier tipo de software** (requisito del propietario, 2026-11-02). La cadena de etapas es la misma para todos. Lo que cambia según el tipo se agrupa en un **perfil de software**, una pieza intercambiable igual que los ejecutores:
+
+| Pieza del perfil | Qué define |
+|---|---|
+| Entorno | Cómo se construye y ejecuta: imagen, dependencias, servicios auxiliares |
+| Oráculo | Cómo se comprueba que funciona: tests, escenarios, comparación con una referencia, evaluaciones |
+| Despliegue | Dónde y cómo se publica, y cómo se vigila después |
+
+| Perfil | Oráculo natural | Fuerza del oráculo |
+|---|---|---|
+| App web | Recorridos de usuario ocultos con agente de navegador | Fuerte para la funcionalidad, débil para el diseño visual y la UX |
+| API o servicio | Tests de contrato y escenarios contra la API | Fuerte |
+| CLI o librería | Suite de tests y comparación con una implementación de referencia | Fuerte |
+| Pipeline de datos | Comparación de salidas con datos de referencia | Fuerte si hay datos de referencia |
+| Producto con IA | Evaluaciones con conjuntos de prueba y jueces | Medio: no es determinista |
+| Móvil o escritorio | Recorridos con emulador | Medio: entornos caros |
+| Juegos, UX, contenido | Personas | Débil: la puerta humana pesa más |
+
+Un perfil solo entra en autonomía cuando demuestra con datos que su oráculo detecta los fallos y las trampas (canarias, como en F0). Se empieza por **app web**, que tiene oráculo fuerte y benchmark público, y se añaden perfiles uno a uno. No hay evidencia de una factory que funcione para todo tipo de software a la vez [Probable], y un perfil sin oráculo probado acabaría aceptando software que no funciona.
+
 ## 4. Producto completo: cómo se haría y qué dice la evidencia
 
 - **Flujo**: una persona aprueba la spec con sus escenarios (E2). Un proceso aparte escribe los escenarios ocultos. La factory planifica, construye y verifica tarea a tarea (E3–E5), despliega en staging, y un agente de navegador recorre los escenarios ocultos (E7). Una persona decide la entrega.
@@ -55,13 +77,15 @@ Todo lo construido en F0 es el núcleo de E4 y E5: el contrato de ejecutor, los 
 ## 7. Orden propuesto
 
 1. **Fase A · Núcleo (E4–E5)**: cerrar la medición de implementar y verificar con las 26 tareas Python y las TS que salgan. Es lo de F0, recortado. Sale cuando hay datos de coste y de trampas por brazo.
-2. **Fase B · De la spec al producto (E2–E5 + E7 en staging)**: construir una **app web interna desde cero** a partir de una spec aprobada, con escenarios ocultos y agente de navegador. No usa código del cliente, así que puede empezar sin tocar el piloto.
+2. **Fase B · De la spec al producto, primer perfil (E2–E5 + E7 en staging)**: construir una **app web interna desde cero** a partir de una spec aprobada, con escenarios ocultos y agente de navegador. No usa código del cliente, así que puede empezar sin tocar el piloto. El perfil se diseña como pieza intercambiable desde el primer día.
 3. **Fase C · Cadena completa en el piloto (E1–E8)**: épicas y migraciones en los repos reales, despliegue con flags y la vuelta desde producción.
+4. **Fase D · Más perfiles**: API o servicio, CLI o librería, pipeline de datos y producto con IA, uno a uno, cada uno con su oráculo probado.
 
 Cada fase tendrá criterio de salida y de abandono medibles, como ahora.
 
 ## Decisiones abiertas
 
-- ¿Este es el alcance correcto de la factory?
+- ¿Este es el alcance correcto de la factory (cualquier software, por perfiles)?
+- ¿Qué perfil va después de app web?
 - ¿El orden A → B → C?
 - ¿Qué app web interna concreta se usa en la fase B?
