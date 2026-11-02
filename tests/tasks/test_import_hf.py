@@ -284,7 +284,7 @@ def test_write_task_keeps_the_hidden_material_out_of_the_visible_tree(
 
     generated = to_harbor(visible, tmp_path / "harbor")
     instruction = (generated / "instruction.md").read_text(encoding="utf-8")
-    assert instruction.startswith("Widget totals are off by one")
+    assert "Widget totals are off by one" in instruction
 
 
 def test_write_task_without_interface_skips_the_section(tmp_path: Path) -> None:

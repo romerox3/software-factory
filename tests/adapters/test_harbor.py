@@ -221,7 +221,7 @@ def test_mini_swe_agent_image_has_the_runtime_extras() -> None:
 
 def test_prompt_is_the_common_base_and_records_its_own_hash() -> None:
     text = prompt_text()
-    assert "/workspace/.factory/abort.json" in text
+    assert "{{ workdir }}/.factory/abort.json" in text
     assert "read-only" in text
     assert "no network" in text
     assert PROMPT_PATH.name == "base-v1.md"

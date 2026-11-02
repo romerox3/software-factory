@@ -14,6 +14,8 @@ from factory.run_matrix import (
     REPO_ROOT,
     Deps,
     ExistingVerdict,
+    PlannedRun,
+    build_input_document,
     build_plan,
     load_matrix,
     main,
@@ -94,6 +96,22 @@ def _run_args(store: Path, arms: Path, out: Path, work: Path, *extra: str) -> li
 # ---------------------------------------------------------------------------
 # Arms, tasks and planning
 # ---------------------------------------------------------------------------
+
+
+def test_input_document_points_the_abort_channel_at_the_task_workdir(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    task_path = store / "visible" / TASK_ID / "factory.task.json"
+    task = json.loads(task_path.read_text(encoding="utf-8"))
+    task["repo"]["workdir"] = "/testbed"
+    task_path.write_text(json.dumps(task), encoding="utf-8")
+    matrix = load_matrix(write_arms(tmp_path / "arms.json"))
+    run = PlannedRun(
+        arm=matrix.arms[0], task_id=TASK_ID, repetition=1, attempt=1, run_id="r-0000001"
+    )
+
+    document = build_input_document(run, store, task)
+
+    assert document["abort_path"] == "/testbed/.factory/abort.json"
 
 
 def test_repository_arms_file_has_the_six_f1_arms() -> None:

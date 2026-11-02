@@ -41,6 +41,7 @@ from urllib.parse import quote, urlsplit
 import httpx
 import jsonschema
 
+from factory.adapters.abort import abort_path_for
 from factory.adapters.config import GATEWAY_BASE_URL, AgentConfig, agent_config
 from factory.adapters.diff import HostDiff, empty_diff
 from factory.adapters.exit import ERROR, ExitDecision, map_exit
@@ -56,6 +57,7 @@ from factory.adapters.prompt import prompt_sha
 from factory.gateway.client import FactoryKeysClient
 from factory.normalize import normalize_text
 from factory.tasks.to_harbor import snapshot_head, to_harbor
+from factory.tasks.workdir import workdir_of
 from factory.verifier.verdict import (
     ERROR_INFRA,
     Verdict,
@@ -620,6 +622,7 @@ def build_input_document(
         "model": {"gateway_alias": run.arm.gateway_alias},
         "prompt": {"template_id": "base-v1", "sha256": prompt_sha()},
         "data_class": run.arm.data_class,
+        "abort_path": abort_path_for(workdir_of(task)),
     }
     _validate_input(document)
     return document

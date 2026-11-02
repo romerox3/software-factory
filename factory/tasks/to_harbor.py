@@ -16,6 +16,7 @@ from typing import Any
 import jsonschema
 
 from factory.adapters.config import image_snippet
+from factory.adapters.prompt import render_prompt
 from factory.tasks.import_hf import REBENCH_ENV_BIN, REBENCH_ENV_PREFIX
 from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
@@ -50,9 +51,9 @@ def to_harbor(
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise ValueError(f"output task directory already exists and is not empty: {target}")
 
-    instruction = _build_instruction(visible_task_dir, task_id)
-    task_toml = _build_task_toml(task, hosts)
     workdir = workdir_of(task)
+    instruction = render_prompt(_build_instruction(visible_task_dir, task_id), workdir)
+    task_toml = _build_task_toml(task, hosts)
     snapshot = _snapshot_git(visible_task_dir)
     if snapshot is None and workdir != DEFAULT_WORKDIR:
         raise ValueError(

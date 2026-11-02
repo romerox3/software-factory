@@ -1,6 +1,6 @@
 # Base prompt v1
 
-Solve the task described below inside the repository at `/workspace`.
+Solve the task described below inside the repository at `{{ workdir }}`.
 
 {{ task }}
 
@@ -10,13 +10,13 @@ Solve the task described below inside the repository at `/workspace`.
   run them, but changing them invalidates the submission.
 - There is no network except the model endpoint.
 - The repository has no useful git history: do not look for the fix in it.
-- Work only inside `/workspace`. Leave a coherent change behind; do not commit.
+- Work only inside `{{ workdir }}`. Leave a coherent change behind; do not commit.
 
 ## Abort channel
 
 If the specification and the visible tests contradict each other, or the task
 cannot be completed without violating the specification, write
-`/workspace/.factory/abort.json` with this shape and stop:
+`{{ workdir }}/.factory/abort.json` with this shape and stop:
 
 ```json
 {"reason": "...", "spec_refs": ["..."], "test_refs": ["..."]}

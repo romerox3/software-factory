@@ -35,6 +35,13 @@ def test_valid_abort_is_returned_and_normalized(tmp_path: Path) -> None:
     }
 
 
+def test_custom_workdir_reads_the_abort_document_from_that_path(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    set_file(workspace, ".factory/abort.json", '{"reason": "spec conflict"}')
+
+    assert read_abort(workspace, workdir="/testbed") == {"reason": "spec conflict"}
+
+
 def test_reason_is_required(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     set_file(workspace, ".factory/abort.json", '{"spec_refs": []}')

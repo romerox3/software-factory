@@ -1,8 +1,8 @@
 """Read and validate the agent's abort channel from an exported workspace.
 
-``/workspace/.factory/abort.json`` is written by the agent, so both its location
-and its contents are untrusted. The path must stay under the exported workspace
-and the document must match the ``abort`` object of the output schema.
+``<workdir>/.factory/abort.json`` is written by the agent, so both its location
+and its contents are untrusted. The path must stay under the task's workdir and
+the document must match the ``abort`` object of the output schema.
 """
 
 from __future__ import annotations
@@ -11,10 +11,15 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-DEFAULT_ABORT_PATH = "/workspace/.factory/abort.json"
-WORKSPACE_ROOT = PurePosixPath("/workspace")
+DEFAULT_WORKDIR = "/workspace"
+DEFAULT_ABORT_PATH = f"{DEFAULT_WORKDIR}/.factory/abort.json"
 MAX_ABORT_BYTES = 64 * 1024
 ALLOWED_KEYS = frozenset({"reason", "spec_refs", "test_refs"})
+
+
+def abort_path_for(workdir: str = DEFAULT_WORKDIR) -> str:
+    """The container path where the agent writes the abort document."""
+    return str(PurePosixPath(workdir) / ".factory" / "abort.json")
 
 
 class InvalidAbort(ValueError):
@@ -22,10 +27,15 @@ class InvalidAbort(ValueError):
 
 
 def read_abort(
-    workspace: str | Path, abort_path: str = DEFAULT_ABORT_PATH
+    workspace: str | Path,
+    abort_path: str | None = None,
+    *,
+    workdir: str = DEFAULT_WORKDIR,
 ) -> dict[str, Any] | None:
     """Return the validated abort document, or ``None`` when the agent did not abort."""
-    path = _workspace_path(workspace, abort_path)
+    if abort_path is None:
+        abort_path = abort_path_for(workdir)
+    path = _workspace_path(workspace, abort_path, workdir)
     if not path.exists():
         return None
     if path.is_symlink() or not path.is_file():
@@ -58,19 +68,22 @@ def validate_abort(document: Any) -> dict[str, Any]:
     return {key: document[key] for key in ("reason", "spec_refs", "test_refs") if key in document}
 
 
-def _workspace_path(workspace: str | Path, abort_path: str) -> Path:
+def _workspace_path(workspace: str | Path, abort_path: str, workdir: str) -> Path:
     root = Path(workspace).resolve()
     if not root.is_dir():
         raise InvalidAbort(f"workspace is not a directory: {workspace}")
+    base = PurePosixPath(workdir)
+    if not base.is_absolute():
+        raise InvalidAbort(f"workdir must be absolute: {workdir}")
     candidate = PurePosixPath(abort_path)
     if not candidate.is_absolute():
         raise InvalidAbort(f"abort path must be absolute: {abort_path}")
     try:
-        relative = candidate.relative_to(WORKSPACE_ROOT)
+        relative = candidate.relative_to(base)
     except ValueError as exc:
-        raise InvalidAbort(f"abort path is outside /workspace: {abort_path}") from exc
+        raise InvalidAbort(f"abort path is outside {workdir}: {abort_path}") from exc
     if any(part == ".." for part in relative.parts):
-        raise InvalidAbort(f"abort path escapes /workspace: {abort_path}")
+        raise InvalidAbort(f"abort path escapes {workdir}: {abort_path}")
     path = root.joinpath(*relative.parts)
     if not path.resolve().is_relative_to(root):
         raise InvalidAbort(f"abort path escapes the exported workspace: {abort_path}")

@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from factory.adapters import image_snippet
+from factory.adapters.prompt import prompt_text
 from factory.tasks.import_hf import REBENCH_ENV_PREFIX
 from factory.tasks.to_harbor import to_harbor
 
@@ -62,6 +63,21 @@ def test_instruction_joins_proposal_and_specs_in_order(tmp_path: Path) -> None:
         < instruction.index("SPEC-ALPHA")
         < instruction.index("SPEC-BETA")
     )
+
+
+def test_instruction_carries_the_base_prompt_and_the_task_workdir(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    add_snapshot(task_dir)
+    write_task_config(task_dir, repo={**TASK["repo"], "workdir": "/testbed"})
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    instruction = (generated / "instruction.md").read_text(encoding="utf-8")
+    header = prompt_text().split("{{ task }}", 1)[0].replace("{{ workdir }}", "/testbed")
+    assert instruction.startswith(header)
+    assert "PROPOSAL-CONTENT" in instruction
+    assert "/testbed/.factory/abort.json" in instruction
+    assert "/workspace" not in instruction
 
 
 def test_task_toml_and_dockerfile(tmp_path: Path) -> None:
