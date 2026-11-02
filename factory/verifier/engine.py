@@ -692,7 +692,7 @@ def _execute(
             else:
                 private = state.tmp / f"report-{nonce}.xml"
                 private.write_bytes(data)
-                xml = dict(parse_junit(private))
+                xml = dict(parse_junit(private, merge_duplicates=(task.framework != "pytest")))
         except Exception:  # noqa: BLE001 - fail closed on purpose
             problem = "invalid"
 

@@ -199,3 +199,47 @@ def test_jest_keeps_the_junit_only_channel_and_gets_no_plugin(ts_mirror) -> None
         base_commit=ts_mirror[1],
     )
     assert verdict.verdict == "accept", verdict.reason
+
+
+def ts_verdict(ts_mirror, xml: str):
+    """Verify the harmless ts diff against a jest task whose report is ``xml``."""
+
+    def behavior(request: RunRequest) -> RunResult:
+        found = re.search(r"/logs/verifier/report-[0-9a-f]+\.xml", request.command)
+        assert found is not None
+        (request.logs_dir / Path(found.group(0)).name).write_text(xml, encoding="utf-8")
+        return RunResult(exit_code=0)
+
+    store = make_ts_store(Path(tempfile.mkdtemp()))
+    diff = (
+        b"--- a/src/calc.ts\n+++ b/src/calc.ts\n@@ -1,3 +1,4 @@\n+// harmless\n"
+        b" /** Toy calculator used as a fixture repository. */\n \n"
+        b" export function add(a: number, b: number): number {\n"
+    )
+    return verify(
+        store,
+        "ts-calc-task",
+        diff,
+        ts_mirror[0],
+        run=None,
+        sandbox=FakeSandbox(behavior),
+        attempt=1,
+        base_commit=ts_mirror[1],
+    )
+
+
+JEST_CASE = "<testcase classname='src/extra.test.ts' name='extra' />"
+
+
+def test_a_jest_report_repeating_a_passing_id_is_an_accept(ts_mirror) -> None:
+    verdict = ts_verdict(ts_mirror, f"<testsuites>{JEST_CASE}{JEST_CASE}</testsuites>")
+    assert verdict.verdict == "accept", verdict.reason
+
+
+def test_a_jest_report_repeating_an_id_keeps_the_failing_copy(ts_mirror) -> None:
+    """One passing copy must never hide the failing one: the merge keeps the worst status."""
+    failed_case = (
+        "<testcase classname='src/extra.test.ts' name='extra'><failure message='x'/></testcase>"
+    )
+    verdict = ts_verdict(ts_mirror, f"<testsuites>{JEST_CASE}{failed_case}</testsuites>")
+    assert verdict.verdict == "reject"

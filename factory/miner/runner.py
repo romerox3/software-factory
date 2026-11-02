@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import shutil
 import subprocess
 import tempfile
@@ -100,8 +101,14 @@ class DockerRunner:
             if logs_dir is not None:
                 report = logs_dir / PurePosixPath(junit_path).name
             _remove_stale_report(report)
+            name = "factory-reval-" + secrets.token_hex(6)
             command = docker_command(
-                self.image, repo_dir, test_command, workdir=workdir, logs_dir=logs_dir
+                self.image,
+                repo_dir,
+                test_command,
+                workdir=workdir,
+                logs_dir=logs_dir,
+                name=name,
             )
             try:
                 subprocess.run(
@@ -112,6 +119,8 @@ class DockerRunner:
                     timeout=timeout_sec,
                 )
             except subprocess.TimeoutExpired as exc:
+                # The docker client died with the timeout; the container did not.
+                _kill_container(name)
                 raise RunnerError(f"docker run timed out after {timeout_sec}s") from exc
             except OSError as exc:
                 raise RunnerError(f"could not run docker: {exc}") from exc
@@ -131,6 +140,7 @@ def docker_command(
     *,
     workdir: str = DEFAULT_WORKDIR,
     logs_dir: Path | None = None,
+    name: str | None = None,
 ) -> list[str]:
     """Build the isolated ``docker run`` invocation for ``test_command``."""
     repo_dir = Path(repo_dir).resolve()
@@ -138,6 +148,10 @@ def docker_command(
         "docker",
         "run",
         "--rm",
+    ]
+    if name is not None:
+        command += ["--name", name]
+    command += [
         "--network",
         "none",
         "-v",
@@ -222,6 +236,15 @@ def _restore_ownership(image: str, repo_dir: Path, *, workdir: str, logs_dir: Pa
         )
 
 
+def _kill_container(name: str) -> None:
+    """Stop and remove the container a timed-out ``docker run`` left behind."""
+    for command in (["docker", "kill", name], ["docker", "rm", "-f", name]):
+        try:
+            subprocess.run(command, capture_output=True, check=False, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            continue
+
+
 def _resolve_report(repo_dir: Path, junit_path: str) -> Path:
     report = Path(junit_path)
     if report.is_absolute():
@@ -242,7 +265,7 @@ def _read_report(report: Path, repo_dir: Path) -> dict[str, Status]:
     if not report.is_file():
         raise RunnerError(f"test command produced no JUnit report at {report}")
     try:
-        statuses = parse_junit(report)
+        statuses = parse_junit(report, merge_duplicates=True)
     except (OSError, ValueError) as exc:
         raise RunnerError(f"could not parse JUnit report at {report}: {exc}") from exc
     return {pytest_node_id(test_id, repo_dir): status for test_id, status in statuses.items()}

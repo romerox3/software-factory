@@ -28,15 +28,20 @@ _STATUS_PRECEDENCE: tuple[tuple[str, Status], ...] = (
     ("skipped", "skipped"),
 )
 
+# Ordered from worst to best: merging repeated ids keeps the worst status.
+_STATUS_RANK: dict[Status, int] = {"passed": 0, "skipped": 1, "failed": 2, "error": 3}
+
 _WHITESPACE = re.compile(r"\s+")
 
 
-def parse_junit(path: Path) -> dict[str, Status]:
+def parse_junit(path: Path, *, merge_duplicates: bool = False) -> dict[str, Status]:
     """Return the status of every ``<testcase>`` in the JUnit report at ``path``.
 
-    Raises ``ValueError`` for reports larger than ``MAX_REPORT_BYTES`` or for
-    reports that repeat a test id. Malicious XML (DTDs, entities) raises the
-    exception from ``defusedxml``.
+    Raises ``ValueError`` for reports larger than ``MAX_REPORT_BYTES`` or, unless
+    ``merge_duplicates`` is set, for reports that repeat a test id. With merging,
+    a repeated id keeps its worst status so an extra passing copy can never hide
+    a failing one. Malicious XML (DTDs, entities) raises the exception from
+    ``defusedxml``.
     """
     size = path.stat().st_size
     if size > MAX_REPORT_BYTES:
@@ -49,9 +54,15 @@ def parse_junit(path: Path) -> dict[str, Status]:
     statuses: dict[str, Status] = {}
     for testcase in root.iter("testcase"):
         test_id = _test_id(testcase)
-        if test_id in statuses:
+        status = _status(testcase)
+        previous = statuses.get(test_id)
+        if previous is None:
+            statuses[test_id] = status
+            continue
+        if not merge_duplicates:
             raise ValueError(f"duplicate test id in JUnit report: {test_id!r}")
-        statuses[test_id] = _status(testcase)
+        if _STATUS_RANK[status] > _STATUS_RANK[previous]:
+            statuses[test_id] = status
     return statuses
 
 

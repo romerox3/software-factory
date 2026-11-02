@@ -74,6 +74,47 @@ def test_duplicate_id_is_rejected() -> None:
         parse_junit(DATA_DIR / "duplicate.xml")
 
 
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        ("passed", "failed", "failed"),
+        ("failed", "passed", "failed"),
+        ("passed", "skipped", "skipped"),
+        ("failed", "error", "error"),
+        ("passed", "passed", "passed"),
+    ],
+)
+def test_repeated_ids_merge_to_the_worst_status(
+    tmp_path: Path, first: str, second: str, expected: str
+) -> None:
+    report = tmp_path / "merged.xml"
+    report.write_text(
+        "<testsuite>"
+        + _testcase("calc.Round", "test_half", first)
+        + _testcase("calc.Round", "test_half", second)
+        + "</testsuite>",
+        encoding="utf-8",
+    )
+
+    assert parse_junit(report, merge_duplicates=True) == {"calc.Round::test_half": expected}
+
+
+def test_merge_duplicates_accepts_the_duplicate_fixture() -> None:
+    assert parse_junit(DATA_DIR / "duplicate.xml", merge_duplicates=True) == {
+        "calc.Round::test_half": "passed"
+    }
+
+
+def _testcase(classname: str, name: str, status: str) -> str:
+    body = {
+        "passed": "",
+        "failed": "<failure message='x'/>",
+        "error": "<error message='x'/>",
+        "skipped": "<skipped/>",
+    }[status]
+    return f'<testcase classname="{classname}" name="{name}">{body}</testcase>'
+
+
 def test_dtd_with_entity_is_rejected() -> None:
     with pytest.raises(DefusedXmlException):
         parse_junit(DATA_DIR / "xxe.xml")

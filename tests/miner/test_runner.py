@@ -73,20 +73,13 @@ def test_docker_runner_builds_an_isolated_command(
 
     statuses = DockerRunner("python:3.12-slim").run(repo, PYTEST, "junit.xml", 60)
 
+    name = captured[0][captured[0].index("--name") + 1]
     assert captured == [
-        docker_command("python:3.12-slim", repo, PYTEST),
+        docker_command("python:3.12-slim", repo, PYTEST, name=name),
         docker_fixup_command("python:3.12-slim", repo),
     ]
-    assert captured[0][:8] == [
-        "docker",
-        "run",
-        "--rm",
-        "--network",
-        "none",
-        "-v",
-        f"{repo}:/workspace",
-        "-w",
-    ]
+    assert captured[0][:5] == ["docker", "run", "--rm", "--name", name]
+    assert captured[0][5:9] == ["--network", "none", "-v", f"{repo}:/workspace"]
     assert statuses == {"tests/test_ok.py::test_ok": "passed"}
 
 
@@ -159,7 +152,33 @@ def test_docker_runner_restores_ownership_after_a_timeout(
     with pytest.raises(RunnerError, match="timed out"):
         DockerRunner("python:3.12-slim").run(repo, "sleep 5", "junit.xml", 1)
 
-    assert captured[1] == docker_fixup_command("python:3.12-slim", repo)
+    assert captured[-1] == docker_fixup_command("python:3.12-slim", repo)
+
+
+def test_docker_runner_kills_the_container_left_by_a_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repo(tmp_path).resolve()
+    captured: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured.append(command)
+        if "chown" in command:
+            return subprocess.CompletedProcess(command, 0)
+        if command[1] == "run":
+            raise subprocess.TimeoutExpired(command, 1)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_run)
+
+    with pytest.raises(RunnerError, match="timed out"):
+        DockerRunner("python:3.12-slim").run(repo, "sleep 5", "junit.xml", 1)
+
+    run_command = captured[0]
+    name = run_command[run_command.index("--name") + 1]
+    assert name.startswith("factory-reval-")
+    assert captured[1:3] == [["docker", "kill", name], ["docker", "rm", "-f", name]]
+    assert captured[-1] == docker_fixup_command("python:3.12-slim", repo)
 
 
 def test_docker_runner_logs_a_failed_fixup(
