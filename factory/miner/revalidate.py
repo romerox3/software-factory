@@ -182,9 +182,11 @@ def _derive(
 
 
 def _copy_repo(source: Path, dest: Path) -> None:
+    """Copy ``source`` to ``dest`` keeping symlinks as symlinks, dangling ones included."""
     shutil.copytree(
         source,
         dest,
+        symlinks=True,
         ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache"),
     )
 

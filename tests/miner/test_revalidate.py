@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -177,6 +178,25 @@ def test_unapplicable_gold_patch_is_rejected(tmp_path: Path) -> None:
     assert result["valid"] is False
     assert result["reason"] == "patch_failed"
     assert result["runs"] == {"base": [], "gold": []}
+
+
+def test_copy_repo_keeps_symlinks_including_dangling_ones(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    (source / "node_modules" / "tool").mkdir(parents=True)
+    (source / "node_modules" / "tool" / "cli.js").write_text("console.log(1)\n", encoding="utf-8")
+    (source / "node_modules" / ".bin").mkdir()
+    (source / "node_modules" / ".bin" / "tool").symlink_to("../tool/cli.js")
+    (source / "missing-target").symlink_to("node_modules/gone/index.js")
+
+    dest = tmp_path / "dest"
+    revalidate_module._copy_repo(source, dest)
+
+    for relative in ("node_modules/.bin/tool", "missing-target"):
+        copied = dest / relative
+        assert copied.is_symlink()
+        assert os.readlink(copied) == os.readlink(source / relative)
+    assert os.readlink(dest / "node_modules/.bin/tool") == "../tool/cli.js"
+    assert not (dest / "missing-target").exists()
 
 
 def test_scratch_directories_live_under_the_given_root(tmp_path: Path) -> None:
