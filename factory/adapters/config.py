@@ -62,6 +62,7 @@ MINI_SWE_AGENT_IMAGE: Final = (
     "RUN UV_TOOL_DIR=/opt/factory-tools UV_TOOL_BIN_DIR=/opt/factory-tools/bin \\",
     "      UV_PYTHON_INSTALL_DIR=/opt/factory-tools/python \\",
     "      uv tool install --python 3.12 mini-swe-agent==2.4.6 \\",
+    "      --with litellm --with orjson --with fastapi \\",
     " && /opt/factory-tools/bin/mini-swe-agent --help",
     "ENV PATH=$PATH:/opt/factory-tools/bin",
 )
@@ -83,7 +84,7 @@ class AgentConfig:
 EXECUTORS: Final[dict[str, AgentConfig]] = {
     "claude-code": AgentConfig(
         name="claude-code",
-        harbor_agent="claude-code",
+        harbor_agent="factory_harbor_agents:PinnedClaudeCode",
         cli_version="2.1.316",
         model_prefix="anthropic/",
         raw_format="claude-stream-json",
@@ -101,7 +102,7 @@ EXECUTORS: Final[dict[str, AgentConfig]] = {
     ),
     "codex": AgentConfig(
         name="codex",
-        harbor_agent="codex",
+        harbor_agent="factory_harbor_agents:PinnedCodex",
         cli_version="0.166.0",
         model_prefix="openai/",
         raw_format="codex-exec-jsonl",
@@ -114,7 +115,7 @@ EXECUTORS: Final[dict[str, AgentConfig]] = {
     ),
     "opencode": AgentConfig(
         name="opencode",
-        harbor_agent="opencode",
+        harbor_agent="factory_harbor_agents:PinnedOpenCode",
         cli_version="1.19.5",
         model_prefix="openai/",
         raw_format="opencode-run-json",
@@ -127,7 +128,7 @@ EXECUTORS: Final[dict[str, AgentConfig]] = {
     ),
     "mini-swe-agent": AgentConfig(
         name="mini-swe-agent",
-        harbor_agent="mini-swe-agent",
+        harbor_agent="factory_harbor_agents:PinnedMiniSweAgent",
         cli_version="2.4.6",
         model_prefix="openai/",
         raw_format="mini-traj-json",

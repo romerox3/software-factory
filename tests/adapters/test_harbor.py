@@ -150,6 +150,23 @@ def test_other_image_snippets_pin_the_released_package() -> None:
     assert "mini-swe-agent==2.4.6" in "\n".join(image_snippet("mini-swe-agent"))
 
 
+def test_every_harbor_agent_is_a_pinned_import_path() -> None:
+    expected = {
+        "claude-code": "PinnedClaudeCode",
+        "codex": "PinnedCodex",
+        "opencode": "PinnedOpenCode",
+        "mini-swe-agent": "PinnedMiniSweAgent",
+    }
+    for name, class_name in expected.items():
+        assert EXECUTORS[name].harbor_agent == f"factory_harbor_agents:{class_name}"
+
+
+def test_mini_swe_agent_image_has_the_runtime_extras() -> None:
+    text = "\n".join(image_snippet("mini-swe-agent"))
+    assert "--with litellm --with orjson --with fastapi" in text
+    assert "pip install" not in text
+
+
 def test_prompt_is_the_common_base_and_records_its_own_hash() -> None:
     text = prompt_text()
     assert "/workspace/.factory/abort.json" in text

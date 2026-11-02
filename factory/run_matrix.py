@@ -43,7 +43,7 @@ import jsonschema
 
 from factory.adapters.config import GATEWAY_BASE_URL, AgentConfig, agent_config
 from factory.adapters.diff import HostDiff, empty_diff
-from factory.adapters.exit import ExitDecision, map_exit
+from factory.adapters.exit import ERROR, ExitDecision, map_exit
 from factory.adapters.harbor import build_harbor_command
 from factory.adapters.output import (
     RunTiming,
@@ -64,6 +64,8 @@ from factory.verifier.verdict import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INPUT_SCHEMA_PATH = REPO_ROOT / "schemas" / "executor-input.schema.json"
+# Harbor agents that refuse to install executor CLIs over the network.
+HARBOR_AGENTS_DIR = REPO_ROOT / "infra" / "harbor"
 
 MAX_ATTEMPTS = 3
 HARBOR_TIMEOUT_MARGIN_S = 600
@@ -703,6 +705,16 @@ def _redact(text: str, *secrets: str | None) -> str:
     return text
 
 
+def harbor_environment(
+    executor: str, key: str, alias: str, gateway_url: str = GATEWAY_BASE_URL
+) -> dict[str, str]:
+    """The child env for ``harbor run``, with the pinned agents on ``PYTHONPATH``."""
+    env = os.environ | run_environment(executor, key, alias, gateway_url)
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = os.pathsep.join(part for part in (str(HARBOR_AGENTS_DIR), existing) if part)
+    return env
+
+
 # ---------------------------------------------------------------------------
 # One attempt
 # ---------------------------------------------------------------------------
@@ -726,8 +738,7 @@ def _execute_attempt(
         try:
             deps.harbor(
                 command.argv,
-                env=os.environ
-                | run_environment(run.arm.executor, key, command.model, args.gateway_url),
+                env=harbor_environment(run.arm.executor, key, command.model, args.gateway_url),
                 timeout=int(run.arm.budget["wall_s"]) + HARBOR_TIMEOUT_MARGIN_S,
                 capture_output=True,
                 text=True,
@@ -743,13 +754,17 @@ def _execute_attempt(
         patch = _read_bytes(trial / "verifier" / "diff.patch") if trial is not None else b""
         host_diff = _host_diff(patch)
 
-        decision = map_exit(
-            executor=run.arm.executor,
-            result=result,
-            timed_out=timed_out,
-            stream=stream,
-            trajectory=trajectory,
-        )
+        setup_failure = _setup_failure(result)
+        if setup_failure is not None:
+            decision = ExitDecision(ERROR, _redact(setup_failure, key))
+        else:
+            decision = map_exit(
+                executor=run.arm.executor,
+                result=result,
+                timed_out=timed_out,
+                stream=stream,
+                trajectory=trajectory,
+            )
         usage = _gateway_usage(spend)
         run_document = build_run_document(
             input_document=attempt.input_document,
@@ -769,7 +784,7 @@ def _execute_attempt(
         run_path = args.out / "runs" / f"{run.run_id}.json"
         write_run_document(run_document, run_path)
 
-        if trial is None or result is None:
+        if trial is None or result is None or setup_failure is not None:
             _write_infra_verdict(
                 run,
                 args,
@@ -1018,6 +1033,28 @@ def _patch_stats(patch: bytes) -> tuple[int, int, int]:
         except ValueError:
             return 0, 0, 0
     return files, added, removed
+
+
+def _setup_failure(result: Mapping[str, Any] | None) -> str | None:
+    """``exception_type: message`` when Harbor failed before the agent started.
+
+    A trial whose agent never ran (no ``agent_execution`` timing) failed in the
+    environment or agent setup; that is infrastructure, not an arm result. An
+    exception after the agent ran keeps the normal ``map_exit`` mapping.
+    """
+    if not isinstance(result, Mapping):
+        return None
+    info = result.get("exception_info")
+    if not isinstance(info, Mapping):
+        return None
+    execution = result.get("agent_execution")
+    if isinstance(execution, Mapping) and execution.get("started_at") is not None:
+        return None
+    exception_type = info.get("exception_type")
+    message = info.get("exception_message")
+    kind = exception_type if isinstance(exception_type, str) else "exception"
+    text = message if isinstance(message, str) else ""
+    return f"{kind}: {text[:300]}"
 
 
 def _agent_reported_usd(result: Mapping[str, Any] | None) -> float | None:

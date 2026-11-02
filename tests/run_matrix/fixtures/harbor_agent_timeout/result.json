@@ -1,0 +1,24 @@
+{
+  "task_name": "demo-task",
+  "trial_name": "demo-task__fake",
+  "exception_info": {
+    "exception_type": "AgentTimeoutError",
+    "exception_message": "Agent exceeded the 1800s wall-clock limit",
+    "exception_traceback": "",
+    "occurred_at": "2026-01-01T00:30:00Z"
+  },
+  "agent_result": null,
+  "verifier_result": null,
+  "environment_setup": {
+    "started_at": "2026-01-01T00:00:00Z",
+    "finished_at": "2026-01-01T00:00:10Z"
+  },
+  "agent_setup": {
+    "started_at": "2026-01-01T00:00:10Z",
+    "finished_at": "2026-01-01T00:00:20Z"
+  },
+  "agent_execution": {
+    "started_at": "2026-01-01T00:00:20Z",
+    "finished_at": "2026-01-01T00:30:00Z"
+  }
+}

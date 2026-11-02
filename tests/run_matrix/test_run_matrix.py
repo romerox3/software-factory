@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from factory.run_matrix import (
 )
 
 from .support import (
+    FIXTURES,
     KEY,
     TASK_ID,
     FakeHarbor,
@@ -275,6 +277,26 @@ def test_one_run_writes_the_dataset_layout(tmp_path: Path) -> None:
     assert dataset.records[0].diff_text
 
 
+def test_harbor_runs_with_the_pinned_agents_on_pythonpath(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PYTHONPATH", "/existing/site-packages")
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    harbor = FakeHarbor()
+
+    code = main(
+        _run_args(store, arms, tmp_path / "out", tmp_path / "work"),
+        deps=_deps(harbor=harbor),
+    )
+
+    assert code == 0
+    pythonpath = harbor.environments[0]["PYTHONPATH"]
+    assert pythonpath == os.pathsep.join(
+        (str(REPO_ROOT / "infra" / "harbor"), "/existing/site-packages")
+    )
+
+
 def test_key_is_revoked_when_harbor_raises(tmp_path: Path) -> None:
     store = write_store(tmp_path)
     arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
@@ -317,6 +339,59 @@ def test_harbor_crash_without_a_trial_yields_error_infra(tmp_path: Path) -> None
     assert run_document["exit"] == "error"
     verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
     assert verdict["verdict"] == "error_infra"
+
+
+def test_setup_exception_is_error_infra_and_retried(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    work = tmp_path / "work"
+    harbor = FakeHarbor(trial_source=FIXTURES / "harbor_setup_failure")
+    verifier = FakeVerifier()
+
+    code = main(_run_args(store, arms, out, work), deps=_deps(harbor=harbor, verifier=verifier))
+
+    run_id = "a1-demo-task-r1-a1"
+    assert code == 0
+    assert verifier.calls == []
+    run_document = json.loads((out / "runs" / f"{run_id}.json").read_text())
+    assert run_document["exit"] == "error"
+    fixture = json.loads((FIXTURES / "harbor_setup_failure" / "result.json").read_text())
+    message = fixture["exception_info"]["exception_message"]
+    expected = f"NetworkConnectionError: {message[:300]}"
+    assert run_document["exit_detail"] == expected
+    verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
+    assert verdict["verdict"] == "error_infra"
+    assert verdict["reason"] == expected
+
+    code = main(_run_args(store, arms, out, work), deps=_deps(harbor=harbor))
+
+    assert code == 0
+    assert harbor.calls == 2
+    retried = json.loads((out / "verdicts" / "a1-demo-task-r1-a2.json").read_text())
+    assert retried["attempt"] == 2
+    assert retried["verdict"] == "error_infra"
+
+
+def test_agent_timeout_after_execution_keeps_map_exit(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    harbor = FakeHarbor(trial_source=FIXTURES / "harbor_agent_timeout")
+    verifier = FakeVerifier("reject")
+
+    code = main(
+        _run_args(store, arms, out, tmp_path / "work"),
+        deps=_deps(harbor=harbor, verifier=verifier),
+    )
+
+    run_id = "a1-demo-task-r1-a1"
+    assert code == 0
+    assert len(verifier.calls) == 1
+    run_document = json.loads((out / "runs" / f"{run_id}.json").read_text())
+    assert run_document["exit"] == "budget_exceeded"
+    verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
+    assert verdict["verdict"] == "reject"
 
 
 def test_verifier_that_writes_nothing_becomes_error_infra(tmp_path: Path) -> None:
