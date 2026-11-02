@@ -180,7 +180,13 @@ case "$verifier_out" in
   *) fail "verifier container network: '$verifier_out'" ;;
 esac
 
-# 5. An agent key cannot mint verifier keys.
+# 5. An agent key cannot mint verifier keys. A 401 from an invalid key proves nothing,
+# so the key must first work for an ordinary request.
+models="$(curl -s -o /dev/null -w '%{http_code}' "$FACTORY_GATEWAY_URL/v1/models" \
+  -H "Authorization: Bearer $FACTORY_AGENT_KEY")"
+if [ "$models" != 200 ]; then
+  fail "agent key is not valid (GET /v1/models returned HTTP $models), so check 5 cannot run"
+else
 code="$(curl -s -o "$scratch/mint.json" -w '%{http_code}' -X POST "$FACTORY_GATEWAY_URL/key/generate" \
   -H "Authorization: Bearer $FACTORY_AGENT_KEY" -H 'Content-Type: application/json' \
   -d "{\"team_id\": \"$FACTORY_VERIFIER_TEAM\", \"max_budget\": 0.01, \"duration\": \"5m\"}")"
@@ -193,6 +199,7 @@ case "$code" in
     fi
     ;;
 esac
+fi
 
 if [ "$failures" -eq 0 ]; then
   echo "isolation-check: all checks passed"
