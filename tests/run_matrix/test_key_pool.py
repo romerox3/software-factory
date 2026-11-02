@@ -12,7 +12,15 @@ import pytest
 
 from factory.run_matrix import Deps, KeyPool, KeyPoolExhausted, main
 
-from .support import FakeHarbor, FakeVerifier, arm, write_arms, write_manifest, write_store
+from .support import (
+    FIXTURES,
+    FakeHarbor,
+    FakeVerifier,
+    arm,
+    write_arms,
+    write_manifest,
+    write_store,
+)
 
 
 def _sha(key: str) -> str:
@@ -202,3 +210,54 @@ def test_run_uses_the_keys_file_and_stops_when_exhausted(
     verdicts = list((tmp_path / "out" / "verdicts").glob("*.json"))
     assert len(verdicts) == 2
     assert len([call for call in gateway.calls if call[0].endswith("/key/info")]) == 2
+
+
+def test_tokens_come_from_the_agent_stream_when_spend_logs_fail(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(
+        tmp_path / "arms.json",
+        [
+            arm(
+                "A4",
+                executor="opencode",
+                gateway_alias="local/nanbeige4.3-33b",
+                provider="local",
+            )
+        ],
+        max_parallel=1,
+    )
+    manifest = write_manifest(tmp_path / "manifest.json", ["demo-task"])
+    keys_file = write_keys(tmp_path / "keys.txt", ["sk-one"])
+    out = tmp_path / "out"
+    gateway = FakeGateway(spend=0.25, logs=None, logs_status=401)
+
+    code = main(
+        _run_args(
+            store,
+            arms,
+            manifest,
+            out,
+            tmp_path / "work",
+            "--keys-file",
+            str(keys_file),
+        ),
+        deps=Deps(
+            harbor=FakeHarbor(trial_source=FIXTURES / "harbor_opencode"),
+            verifier=FakeVerifier(),
+            key_http=gateway,
+            key_sleep=lambda _seconds: None,
+        ),
+    )
+
+    assert code == 0
+    run_document = json.loads((out / "runs" / "a4-demo-task-r1-a1.json").read_text())
+    assert run_document["tokens"] == {
+        "input": 150,
+        "output": 15,
+        "cache_read": 30,
+        "cache_write": 3,
+        "reasoning": 5,
+        "source": "agent",
+    }
+    assert run_document["cost"]["usd_real"] == 0.0
+    assert run_document["cost"]["usd_shadow"] == 0.25

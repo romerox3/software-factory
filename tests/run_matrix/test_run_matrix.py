@@ -114,7 +114,47 @@ def test_repository_arms_file_has_the_six_f1_arms() -> None:
         assert entry.budget["usd"] == 2.0
         assert entry.budget["wall_s"] == 1800
         assert entry.data_class == "public"
+        assert entry.billing == "plan"
     assert matrix.arms[0].budget["max_turns"] == 60
+    expected_limits = {
+        "A1": {"context": 200000, "output": 32768},
+        "A2": {"context": 200000, "output": 32768},
+        "A3": {"context": 200000, "output": 32768},
+        "A4": {"context": 32768, "output": 8192},
+        "A5": {"context": 32768, "output": 8192},
+        "A6": {"context": 200000, "output": 32768},
+    }
+    assert {entry.id: dict(entry.model_limits) for entry in matrix.arms} == expected_limits
+
+
+def test_arms_file_requires_billing_and_model_limits(tmp_path: Path) -> None:
+    document = json.loads((REPO_ROOT / "matrix" / "arms-v1.json").read_text(encoding="utf-8"))
+    path = tmp_path / "arms.json"
+
+    for field in ("billing", "model_limits"):
+        broken = json.loads(json.dumps(document))
+        del broken["arms"][0][field]
+        path.write_text(json.dumps(broken), encoding="utf-8")
+        with pytest.raises((TypeError, ValueError), match=field):
+            load_matrix(path)
+
+    broken = json.loads(json.dumps(document))
+    broken["arms"][0]["billing"] = "free"
+    path.write_text(json.dumps(broken), encoding="utf-8")
+    with pytest.raises(ValueError, match="billing"):
+        load_matrix(path)
+
+    for limits in (
+        {"context": 0, "output": 32768},
+        {"context": 200000},
+        {"context": 200000, "output": 32768, "extra": 1},
+        {"context": True, "output": 32768},
+    ):
+        broken = json.loads(json.dumps(document))
+        broken["arms"][0]["model_limits"] = limits
+        path.write_text(json.dumps(broken), encoding="utf-8")
+        with pytest.raises(ValueError, match="model_limits"):
+            load_matrix(path)
 
 
 def test_plan_is_arms_times_tasks_times_k(tmp_path: Path) -> None:
@@ -254,7 +294,8 @@ def test_one_run_writes_the_dataset_layout(tmp_path: Path) -> None:
     assert run_document["exit"] == "done"
     assert run_document["tokens"]["input"] == 100
     assert run_document["tokens"]["output"] == 20
-    assert run_document["cost"]["usd_real"] == 0.25
+    assert run_document["cost"]["usd_real"] == 0.0
+    assert run_document["cost"]["usd_shadow"] == 0.25
     assert run_document["provenance"]["model_resolved"] == "anthropic/claude-sonnet-5-5"
     assert run_document["diff"]["files_changed"] == 1
     assert run_document["diff"]["lines_added"] == 1
@@ -275,6 +316,26 @@ def test_one_run_writes_the_dataset_layout(tmp_path: Path) -> None:
     assert dataset.records[0].verdict == "reject"
     assert dataset.records[0].cost_usd == 0.25
     assert dataset.records[0].diff_text
+
+
+def test_cost_goes_to_shadow_for_plan_arms_and_real_for_api_arms(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(
+        tmp_path / "arms.json",
+        [arm("A1", billing="plan"), arm("A2", billing="api")],
+        max_parallel=1,
+    )
+    out = tmp_path / "out"
+
+    code = main(_run_args(store, arms, out, tmp_path / "work"), deps=_deps())
+
+    assert code == 0
+    plan = json.loads((out / "runs" / "a1-demo-task-r1-a1.json").read_text())
+    api = json.loads((out / "runs" / "a2-demo-task-r1-a1.json").read_text())
+    assert plan["cost"]["usd_real"] == 0.0
+    assert plan["cost"]["usd_shadow"] == 0.25
+    assert api["cost"]["usd_real"] == 0.25
+    assert api["cost"]["usd_shadow"] == 0.0
 
 
 def test_harbor_runs_with_the_pinned_agents_on_pythonpath(

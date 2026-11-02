@@ -101,6 +101,8 @@ def arm(
     k: int = 1,
     provider: str = "anthropic",
     budget: Mapping[str, Any] | None = None,
+    billing: str = "plan",
+    model_limits: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     return {
         "id": arm_id,
@@ -110,6 +112,8 @@ def arm(
         "budget": dict(budget or {"usd": 2.0, "wall_s": 1800, "max_turns": 60}),
         "k": k,
         "provider": provider,
+        "billing": billing,
+        "model_limits": dict(model_limits or {"context": 200000, "output": 32768}),
     }
 
 

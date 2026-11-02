@@ -31,8 +31,14 @@ def build_harbor_command(
     task_dir: str | Path,
     jobs_dir: str | Path,
     gateway_url: str = GATEWAY_BASE_URL,
+    model_limits: Mapping[str, int] | None = None,
 ) -> HarborCommand:
-    """Return the Harbor invocation for ``document`` (an ``executor-input``)."""
+    """Return the Harbor invocation for ``document`` (an ``executor-input``).
+
+    ``model_limits`` carries the arm's context/output window when the executor
+    needs it: OpenCode caps replies at 4096 tokens unless it knows the model, and
+    Codex has no other way to learn the real window behind a gateway alias.
+    """
     executor = document["executor"]
     config = agent_config(executor["name"])
     version = executor["version"]
@@ -57,12 +63,15 @@ def build_harbor_command(
         "--job-name",
         document["run_id"],
     ]
-    argv += _agent_kwargs(config.name, document, gateway_url)
+    argv += _agent_kwargs(config.name, document, gateway_url, model_limits)
     return HarborCommand(argv=argv, env_names=config.env_names, model=model)
 
 
 def _agent_kwargs(
-    name: str, document: Mapping[str, Any], gateway_url: str = GATEWAY_BASE_URL
+    name: str,
+    document: Mapping[str, Any],
+    gateway_url: str = GATEWAY_BASE_URL,
+    model_limits: Mapping[str, int] | None = None,
 ) -> list[str]:
     executor = document["executor"]
     budget = document["budget"]
@@ -89,22 +98,33 @@ def _agent_kwargs(
                 }
             },
         }
+        if model_limits is not None:
+            config["model_context_window"] = model_limits["context"]
+            config["model_max_output_tokens"] = model_limits["output"]
         return args + ["--agent-kwarg", "config=" + json.dumps(config, separators=(",", ":"))]
 
     if name == "opencode":
         # docs/04 §5.3: OpenAI-compatible provider. Harbor resolves
-        # ``openai/<alias>`` against the provider named ``openai``.
-        config = {
-            "provider": {
-                "openai": {
-                    "npm": "@ai-sdk/openai-compatible",
-                    "options": {
-                        "baseURL": gateway_url,
-                        "apiKey": "{env:FACTORY_GATEWAY_KEY}",
-                    },
+        # ``openai/<alias>`` against the provider named ``openai``. The model id
+        # OpenCode sees is the alias without that prefix.
+        provider: dict[str, Any] = {
+            "npm": "@ai-sdk/openai-compatible",
+            "options": {
+                "baseURL": gateway_url,
+                "apiKey": "{env:FACTORY_GATEWAY_KEY}",
+            },
+        }
+        if model_limits is not None:
+            alias = document["model"]["gateway_alias"]
+            provider["models"] = {
+                alias: {
+                    "limit": {
+                        "context": model_limits["context"],
+                        "output": model_limits["output"],
+                    }
                 }
             }
-        }
+        config = {"provider": {"openai": provider}}
         return args + [
             "--agent-kwarg",
             "opencode_config=" + json.dumps(config, separators=(",", ":")),

@@ -1,0 +1,19 @@
+{
+  "task_name": "demo-task",
+  "trial_name": "demo-task__fake",
+  "exception_info": null,
+  "agent_result": {
+    "n_input_tokens": 0,
+    "n_output_tokens": 0,
+    "cost_usd": 0.0
+  },
+  "verifier_result": {
+    "rewards": {
+      "reward": 1.0
+    }
+  },
+  "agent_execution": {
+    "started_at": "2026-01-01T00:00:20Z",
+    "finished_at": "2026-01-01T00:01:20Z"
+  }
+}

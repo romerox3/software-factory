@@ -96,6 +96,58 @@ def test_opencode_kwargs_use_the_given_gateway_url() -> None:
     assert config["provider"]["openai"]["options"]["baseURL"] == "http://engine.example:9000/v1"
 
 
+def test_opencode_model_limits_declare_the_alias_window() -> None:
+    document = _input("opencode")
+    alias = document["model"]["gateway_alias"]
+
+    command = build_harbor_command(
+        document,
+        task_dir="t",
+        jobs_dir="j",
+        model_limits={"context": 200000, "output": 32768},
+    )
+
+    raw = next(value for value in command.argv if value.startswith("opencode_config="))
+    config = json.loads(raw.split("=", 1)[1])
+    assert config["provider"]["openai"]["models"] == {
+        alias: {"limit": {"context": 200000, "output": 32768}}
+    }
+
+
+def test_opencode_without_model_limits_leaves_the_provider_unchanged() -> None:
+    command = build_harbor_command(_input("opencode"), task_dir="t", jobs_dir="j")
+
+    raw = next(value for value in command.argv if value.startswith("opencode_config="))
+    config = json.loads(raw.split("=", 1)[1])
+    assert "models" not in config["provider"]["openai"]
+
+
+def test_codex_model_limits_carry_both_windows() -> None:
+    command = build_harbor_command(
+        _input("codex"),
+        task_dir="t",
+        jobs_dir="j",
+        model_limits={"context": 32768, "output": 8192},
+    )
+
+    raw = next(value for value in command.argv if value.startswith("config="))
+    config = json.loads(raw.split("=", 1)[1])
+    assert config["model_context_window"] == 32768
+    assert config["model_max_output_tokens"] == 8192
+
+
+def test_executors_without_model_limits_keep_the_default_argv() -> None:
+    for name in ("claude-code", "codex", "opencode", "mini-swe-agent"):
+        document = _input(name)
+        plain = build_harbor_command(document, task_dir="t", jobs_dir="j")
+        explicit_none = build_harbor_command(
+            document, task_dir="t", jobs_dir="j", model_limits=None
+        )
+        assert plain.argv == explicit_none.argv
+        assert not any("model_context_window" in part for part in plain.argv)
+        assert not any("model_max_output_tokens" in part for part in plain.argv)
+
+
 def test_mini_swe_agent_kwargs_carry_the_cost_limit() -> None:
     document = _input("mini-swe-agent")
     command = build_harbor_command(document, task_dir="t", jobs_dir="j")

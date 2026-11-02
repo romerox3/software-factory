@@ -149,7 +149,7 @@ def _tokens(usage: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise ValueError(f"gateway token '{field}' must be a non-negative integer")
         tokens[field] = value
-    tokens["source"] = "gateway"
+    tokens["source"] = raw.get("source", "gateway")
     return tokens
 
 

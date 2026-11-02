@@ -1,0 +1,4 @@
+{"type":"step_start","timestamp":1767225600000,"sessionID":"ses_fixture","part":{}}
+{"type":"step_finish","timestamp":1767225601000,"sessionID":"ses_fixture","part":{"tokens":{"input":100,"output":10,"reasoning":5,"cache":{"read":20,"write":3}}}}
+{"type":"text","timestamp":1767225602000,"sessionID":"ses_fixture","part":{"text":"done"}}
+{"type":"step_finish","timestamp":1767225603000,"sessionID":"ses_fixture","part":{"tokens":{"input":50,"output":5,"reasoning":0,"cache":{"read":10,"write":0}}}}

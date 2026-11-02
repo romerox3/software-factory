@@ -11,6 +11,11 @@
       "id": "A1",
       "executor": "claude-code",
       "gateway_alias": "anthropic/claude-sonnet-5-5",
+      "billing": "plan",
+      "model_limits": {
+        "context": 200000,
+        "output": 32768
+      },
       "data_class": "public",
       "budget": {
         "usd": 2.0,
@@ -24,6 +29,11 @@
       "id": "A2",
       "executor": "codex",
       "gateway_alias": "zai/glm-5.3",
+      "billing": "plan",
+      "model_limits": {
+        "context": 200000,
+        "output": 32768
+      },
       "data_class": "public",
       "budget": {
         "usd": 2.0,
@@ -36,6 +46,11 @@
       "id": "A3",
       "executor": "opencode",
       "gateway_alias": "zai/glm-5.3",
+      "billing": "plan",
+      "model_limits": {
+        "context": 200000,
+        "output": 32768
+      },
       "data_class": "public",
       "budget": {
         "usd": 2.0,
@@ -48,6 +63,11 @@
       "id": "A4",
       "executor": "opencode",
       "gateway_alias": "local/nanbeige4.3-33b",
+      "billing": "plan",
+      "model_limits": {
+        "context": 32768,
+        "output": 8192
+      },
       "data_class": "public",
       "budget": {
         "usd": 2.0,
@@ -60,6 +80,11 @@
       "id": "A5",
       "executor": "mini-swe-agent",
       "gateway_alias": "local/nanbeige4.3-33b",
+      "billing": "plan",
+      "model_limits": {
+        "context": 32768,
+        "output": 8192
+      },
       "data_class": "public",
       "budget": {
         "usd": 2.0,
@@ -72,6 +97,11 @@
       "id": "A6",
       "executor": "claude-code",
       "gateway_alias": "zai/glm-5.3",
+      "billing": "plan",
+      "model_limits": {
+        "context": 200000,
+        "output": 32768
+      },
       "data_class": "public",
       "budget": {
         "usd": 2.0,

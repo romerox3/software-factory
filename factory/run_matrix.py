@@ -46,6 +46,7 @@ from factory.adapters.diff import HostDiff, empty_diff
 from factory.adapters.exit import ERROR, ExitDecision, map_exit
 from factory.adapters.harbor import build_harbor_command
 from factory.adapters.output import (
+    TOKEN_FIELDS,
     RunTiming,
     build_run_document,
     validate_run_document,
@@ -53,6 +54,7 @@ from factory.adapters.output import (
 )
 from factory.adapters.prompt import prompt_sha
 from factory.gateway.client import FactoryKeysClient
+from factory.normalize import normalize_text
 from factory.tasks.to_harbor import snapshot_head, to_harbor
 from factory.verifier.verdict import (
     ERROR_INFRA,
@@ -79,6 +81,8 @@ GATEWAY_HTTP_TIMEOUT_S = 30.0
 
 DATA_CLASSES = frozenset({"public", "internal", "client-product", "client-restricted"})
 BUDGET_FIELDS = frozenset({"usd", "wall_s", "max_turns"})
+BILLINGS = frozenset({"plan", "api"})
+MODEL_LIMIT_FIELDS = frozenset({"context", "output"})
 VERDICTS = frozenset({"accept", "reject", "cheat_suspected", "error_infra"})
 
 STREAM_FILES = {
@@ -258,6 +262,8 @@ class Arm:
     budget: Mapping[str, Any]
     k: int
     provider: str
+    model_limits: Mapping[str, int]
+    billing: str
 
 
 @dataclass(frozen=True)
@@ -378,6 +384,24 @@ def _load_arm(entry: Any, providers: Mapping[str, int]) -> Arm:
         if isinstance(turns, bool) or not isinstance(turns, int) or turns < 1:
             raise ValueError(f"arm {arm_id}: budget.max_turns must be an integer >= 1")
 
+    billing = entry.get("billing")
+    if billing not in BILLINGS:
+        allowed = ", ".join(sorted(BILLINGS))
+        raise ValueError(f"arm {arm_id}: 'billing' must be one of: {allowed}")
+
+    limits = entry.get("model_limits")
+    if not isinstance(limits, dict):
+        raise TypeError(f"arm {arm_id}: 'model_limits' must be an object")
+    unknown = sorted(set(limits) - MODEL_LIMIT_FIELDS)
+    if unknown:
+        raise ValueError(f"arm {arm_id}: unknown model_limits fields: {', '.join(unknown)}")
+    model_limits: dict[str, int] = {}
+    for limit_field in sorted(MODEL_LIMIT_FIELDS):
+        value = limits.get(limit_field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"arm {arm_id}: model_limits.{limit_field} must be an integer >= 1")
+        model_limits[limit_field] = value
+
     return Arm(
         id=arm_id,
         executor=executor,
@@ -386,6 +410,8 @@ def _load_arm(entry: Any, providers: Mapping[str, int]) -> Arm:
         budget=dict(budget),
         k=k,
         provider=provider,
+        model_limits=model_limits,
+        billing=billing,
     )
 
 
@@ -666,6 +692,7 @@ def _harbor_command(run: PlannedRun, document: Mapping[str, Any], work: Path, ga
         task_dir=work / "harbor" / run.arm.executor / run.task_id,
         jobs_dir=work / "jobs",
         gateway_url=gateway_url,
+        model_limits=run.arm.model_limits,
     )
 
 
@@ -765,7 +792,11 @@ def _execute_attempt(
                 stream=stream,
                 trajectory=trajectory,
             )
-        usage = _gateway_usage(spend)
+        usage = _gateway_usage(spend, run.arm.billing)
+        if not isinstance(spend.get("requests"), list):
+            agent_tokens = _agent_reported_tokens(run.arm.executor, run.run_id, stream, trajectory)
+            if agent_tokens is not None:
+                usage["tokens"] = agent_tokens
         run_document = build_run_document(
             input_document=attempt.input_document,
             exit_decision=decision,
@@ -1078,7 +1109,7 @@ def _agent_reported_usd(result: Mapping[str, Any] | None) -> float | None:
     return None
 
 
-def _gateway_usage(payload: Mapping[str, Any]) -> dict[str, Any]:
+def _gateway_usage(payload: Mapping[str, Any], billing: str = "api") -> dict[str, Any]:
     tokens: dict[str, Any] = {
         "input": 0,
         "output": 0,
@@ -1097,11 +1128,60 @@ def _gateway_usage(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not _is_number(usd_real):
         usd_real = payload.get("spend_usd", 0.0)
     usd_shadow = payload.get("usd_shadow", 0.0)
+    real = max(0.0, float(usd_real)) if _is_number(usd_real) else 0.0
+    shadow = max(0.0, float(usd_shadow)) if _is_number(usd_shadow) else 0.0
+    if billing == "plan":
+        # Flat-rate plans and local models cost the owner nothing per token: the
+        # gateway's figure is a list-price shadow cost.
+        shadow, real = real + shadow, 0.0
+    else:
+        shadow = 0.0
     return {
         "tokens": tokens,
-        "usd_real": max(0.0, float(usd_real)) if _is_number(usd_real) else 0.0,
-        "usd_shadow": max(0.0, float(usd_shadow)) if _is_number(usd_shadow) else 0.0,
+        "usd_real": real,
+        "usd_shadow": shadow,
     }
+
+
+def _agent_reported_tokens(
+    executor: str,
+    run_id: str,
+    stream: bytes | None,
+    trajectory: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Sum the agent's own usage events when the gateway has no logs.
+
+    Per-request logs need a virtual key with logging enabled; a plain key has
+    none, but the executor stream still reports what it used. The normalizers
+    own the per-executor format, so this only adds the totals up.
+    """
+    if executor == "mini-swe-agent":
+        if trajectory is None:
+            return None
+        text = json.dumps(trajectory)
+    else:
+        if stream is None:
+            return None
+        text = stream.decode("utf-8", errors="replace")
+    try:
+        normalized = normalize_text(executor, run_id, text)
+    except (TypeError, ValueError):
+        return None
+    totals: dict[str, int] = {}
+    for event in normalized.events:
+        if event.kind != "usage" or not event.tokens:
+            continue
+        for token_field in TOKEN_FIELDS:
+            value = event.tokens.get(token_field)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                totals[token_field] = totals.get(token_field, 0) + value
+    if not totals:
+        return None
+    tokens: dict[str, Any] = {field: totals.get(field) for field in TOKEN_FIELDS}
+    tokens["input"] = totals.get("input", 0)
+    tokens["output"] = totals.get("output", 0)
+    tokens["source"] = "agent"
+    return tokens
 
 
 def _zero_usage() -> dict[str, Any]:

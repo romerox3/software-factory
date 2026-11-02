@@ -134,9 +134,10 @@
         "source": {
           "enum": [
             "gateway",
+            "agent",
             "trajectory"
           ],
-          "description": "gateway is authoritative; trajectory only when the gateway lacks the field."
+          "description": "gateway is authoritative; agent when the gateway has no per-request logs; trajectory only when the gateway lacks the field."
         }
       }
     },
