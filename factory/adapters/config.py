@@ -14,8 +14,19 @@ ExecutorName = Literal["claude-code", "codex", "opencode", "mini-swe-agent"]
 
 GATEWAY_BASE_URL: Final = "http://gateway:4000/v1"
 
+# The task images are Debian 12 without Node.js, and the task's own tools must
+# keep precedence in ``PATH``: the Node runtime is copied under ``/opt`` and its
+# bin directory is appended, never prepended.
+NODE_IMAGE: Final = "node@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da"  # node:22-bookworm-slim
+
+# ``uv`` installs mini-swe-agent into an isolated tool env so the task's Python
+# environment (and its dependencies) is left untouched.
+UV_IMAGE: Final = "ghcr.io/astral-sh/uv@sha256:f459f6f73a8c4ef5d69f4e6fbbdb8af751d6fa40ec34b39a1ab469acd6e289b7"  # uv:0.9.5
+
 CLAUDE_CODE_IMAGE: Final = (
-    "RUN npm install --global @anthropic-ai/claude-code@2.1.316 \\",
+    f"COPY --from={NODE_IMAGE} /usr/local/ /opt/factory-node/",
+    "ENV PATH=$PATH:/opt/factory-node/bin",
+    "RUN npm install --global --prefix /opt/factory-node @anthropic-ai/claude-code@2.1.316 \\",
     " && claude --version",
 )
 
@@ -23,7 +34,9 @@ CLAUDE_CODE_IMAGE: Final = (
 # parses that stderr as the version and reinstalls the CLI (spike 01, B3), so the
 # pinned binary is hidden behind a wrapper that drops stderr for that one call.
 CODEX_IMAGE: Final = (
-    "RUN npm install --global @openai/codex@0.166.0 \\",
+    f"COPY --from={NODE_IMAGE} /usr/local/ /opt/factory-node/",
+    "ENV PATH=$PATH:/opt/factory-node/bin",
+    "RUN npm install --global --prefix /opt/factory-node @openai/codex@0.166.0 \\",
     ' && CODEX_BIN="$(command -v codex)" \\',
     ' && mv "$CODEX_BIN" "$CODEX_BIN.real" \\',
     " && printf '%s\\n' \\",
@@ -38,13 +51,19 @@ CODEX_IMAGE: Final = (
 )
 
 OPENCODE_IMAGE: Final = (
-    "RUN npm install --global opencode-ai@1.19.5 \\",
+    f"COPY --from={NODE_IMAGE} /usr/local/ /opt/factory-node/",
+    "ENV PATH=$PATH:/opt/factory-node/bin",
+    "RUN npm install --global --prefix /opt/factory-node opencode-ai@1.19.5 \\",
     " && opencode --version",
 )
 
 MINI_SWE_AGENT_IMAGE: Final = (
-    "RUN pip install --no-cache-dir mini-swe-agent==2.4.6 \\",
-    " && mini-swe-agent --help",
+    f"COPY --from={UV_IMAGE} /uv /usr/local/bin/uv",
+    "RUN UV_TOOL_DIR=/opt/factory-tools UV_TOOL_BIN_DIR=/opt/factory-tools/bin \\",
+    "      UV_PYTHON_INSTALL_DIR=/opt/factory-tools/python \\",
+    "      uv tool install --python 3.12 mini-swe-agent==2.4.6 \\",
+    " && /opt/factory-tools/bin/mini-swe-agent --help",
+    "ENV PATH=$PATH:/opt/factory-tools/bin",
 )
 
 

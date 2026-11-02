@@ -120,7 +120,21 @@ def test_image_snippet_pins_the_cli_version(name: str) -> None:
     lines = image_snippet(name)
     text = "\n".join(lines)
     assert EXECUTORS[name].cli_version in text
-    assert lines[0].startswith("RUN ")
+    assert any(line.startswith("RUN ") for line in lines)
+
+
+@pytest.mark.parametrize("name", sorted(EXECUTORS))
+def test_image_snippet_leaves_the_task_environment_alone(name: str) -> None:
+    lines = image_snippet(name)
+    text = "\n".join(lines)
+    assert "pip install" not in text
+    for line in lines:
+        if "npm install --global" in line:
+            assert "--prefix /opt/factory-node" in line
+        if line.startswith("ENV PATH="):
+            assert "=$PATH:" in line
+        if "COPY --from=" in line:
+            assert "@sha256:" in line
 
 
 def test_codex_image_uses_the_version_wrapper() -> None:
