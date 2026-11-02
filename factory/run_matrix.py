@@ -1,11 +1,12 @@
 """Run the F0 matrix: every (arm x task x repetition) end to end.
 
-``run`` builds the executor input for each planned attempt, mints one virtual
-key per run, invokes Harbor with the pinned command line and then verifies the
-resulting diff with ``python -m factory.verifier``. It leaves the layout
-``<out>/runs/<run_id>.json``, ``<out>/runs/<run_id>.diff`` and
-``<out>/verdicts/<run_id>.json`` that ``factory.metrics.load.load_dataset``
-reads. ``check`` enforces the F0-18 gate on that layout.
+``run`` builds the executor input for each planned attempt, takes the next key
+from the pre-minted pool (or the key service), invokes Harbor with the pinned
+command line and then verifies the resulting diff with ``python -m
+factory.verifier``. It leaves the layout ``<out>/runs/<run_id>.json``,
+``<out>/runs/<run_id>.diff`` and ``<out>/verdicts/<run_id>.json`` that
+``factory.metrics.load.load_dataset`` reads. ``check`` enforces the F0-18 gate on
+that layout.
 
 Every side effect goes through ``Deps`` so the tests can use fakes: no Docker,
 no network, no real key service. Key values are only ever placed in the child
@@ -21,20 +22,23 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
-from collections import Counter
+import time
+from collections import Counter, deque
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
+import httpx
 import jsonschema
 
 from factory.adapters.config import GATEWAY_BASE_URL, AgentConfig, agent_config
@@ -66,6 +70,10 @@ HARBOR_TIMEOUT_MARGIN_S = 600
 KEY_TTL_MARGIN_S = 600
 VERIFIER_TIMEOUT_S = 3600
 RUN_ID_MAX = 64
+SPEND_SETTLE_S = 15.0
+DEFAULT_KEY_BUDGET_USD = 2.0
+DEFAULT_MANIFEST = REPO_ROOT / "tasks" / "public-v1.manifest.json"
+GATEWAY_HTTP_TIMEOUT_S = 30.0
 
 DATA_CLASSES = frozenset({"public", "internal", "client-product", "client-restricted"})
 BUDGET_FIELDS = frozenset({"usd", "wall_s", "max_turns"})
@@ -93,6 +101,139 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _gateway_get(url: str, headers: Mapping[str, str]) -> tuple[int, Any]:
+    """GET ``url`` and return ``(status_code, decoded JSON or None)``."""
+    response = httpx.get(url, headers=dict(headers), timeout=GATEWAY_HTTP_TIMEOUT_S)
+    try:
+        body: Any = response.json()
+    except ValueError:
+        body = None
+    return response.status_code, body
+
+
+def _key_hash(key: str) -> str:
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+class KeyPoolExhausted(RuntimeError):
+    """The pre-minted pool has no unused key left."""
+
+
+class KeyPool:
+    """Hand out keys minted in advance and read their spend from the gateway.
+
+    ``mint`` never sees a master key: the owner mints the batch and this class
+    only records which hashes were used, so a restart cannot hand out a key
+    twice. The used set lives in ``used_file`` as ``{run_id: sha256(key)}``.
+    """
+
+    def __init__(
+        self,
+        keys_file: str | Path,
+        used_file: str | Path,
+        gateway_url: str,
+        key_budget_usd: float = DEFAULT_KEY_BUDGET_USD,
+        *,
+        http: Callable[[str, Mapping[str, str]], tuple[int, Any]] = _gateway_get,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.keys_file = Path(keys_file)
+        self.used_file = Path(used_file)
+        self.gateway_url = gateway_url.rstrip("/").removesuffix("/v1")
+        self.key_budget_usd = float(key_budget_usd)
+        self._http = http
+        self._sleep = sleep
+        self._lock = threading.Lock()
+        self._keys = _read_pool_keys(self.keys_file)
+        self._used = _read_used_keys(self.used_file)
+        self._used_hashes = set(self._used.values())
+
+    def mint(self, data_class: str, budget_usd: float, ttl_sec: int, run_id: str) -> str:
+        """Return the next unused key and record its hash under ``run_id``."""
+        self.check_budget(budget_usd)
+        with self._lock:
+            for key in self._keys:
+                digest = _key_hash(key)
+                if digest in self._used_hashes:
+                    continue
+                self._used[run_id] = digest
+                self._used_hashes.add(digest)
+                _write_used_keys(self.used_file, self._used)
+                return key
+        raise KeyPoolExhausted(f"key pool {self.keys_file} has no unused keys left")
+
+    def check_budget(self, budget_usd: float) -> None:
+        if budget_usd > self.key_budget_usd:
+            raise ValueError(
+                f"arm budget ${budget_usd:.2f} exceeds the key budget "
+                f"${self.key_budget_usd:.2f} given by --key-budget-usd"
+            )
+
+    def spend(self, key: str) -> Mapping[str, Any]:
+        """Read the key's spend and, when available, its per-request tokens."""
+        self._sleep(SPEND_SETTLE_S)
+        status, body = self._http(
+            f"{self.gateway_url}/key/info", {"Authorization": f"Bearer {key}"}
+        )
+        if status != 200 or not isinstance(body, Mapping):
+            raise RuntimeError(f"gateway /key/info returned HTTP {status}")
+        info = body.get("info")
+        spend = (info if isinstance(info, Mapping) else body).get("spend")
+        if not _is_number(spend):
+            raise RuntimeError("gateway /key/info has no numeric spend")
+
+        payload: dict[str, Any] = {"usd_real": max(0.0, float(spend)), "usd_shadow": 0.0}
+        logs_url = f"{self.gateway_url}/spend/logs?api_key={quote(key, safe='')}&summarize=false"
+        status, logs = self._http(logs_url, {"Authorization": f"Bearer {key}"})
+        if status == 200 and isinstance(logs, list):
+            payload["requests"] = [entry for entry in logs if isinstance(entry, Mapping)]
+        return payload
+
+    def revoke(self, key: str) -> None:
+        """No-op: the owner deletes the whole batch by alias prefix."""
+
+
+def _read_pool_keys(path: Path) -> list[str]:
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+    except OSError as exc:
+        raise ValueError(f"cannot read keys file {path}: {exc}") from exc
+    if mode & 0o077:
+        raise ValueError(f"keys file {path} must be mode 600 or stricter (found {mode:o})")
+    keys: list[str] = []
+    seen: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key = line.strip()
+        if key and key not in seen:
+            seen.add(key)
+            keys.append(key)
+    return keys
+
+
+def _read_used_keys(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict) or not all(
+        isinstance(run_id, str) and isinstance(digest, str) for run_id, digest in document.items()
+    ):
+        raise ValueError(f"{path} must map run ids to sha256 hashes")
+    return dict(document)
+
+
+def _write_used_keys(path: Path, used: Mapping[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(used, indent=2, sort_keys=True) + "\n"
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(tmp_name, path)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
 @dataclass(frozen=True)
 class Deps:
     """The side-effecting steps of the matrix, replaced by fakes in tests."""
@@ -102,6 +243,8 @@ class Deps:
     verifier: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run
     clock: Callable[[], datetime] = _utcnow
     to_harbor: Callable[..., Path] = to_harbor
+    key_http: Callable[[str, Mapping[str, str]], tuple[int, Any]] = _gateway_get
+    key_sleep: Callable[[float], None] = time.sleep
 
 
 @dataclass(frozen=True)
@@ -254,6 +397,34 @@ def valid_task_ids(store: str | Path) -> list[str]:
         for task_dir in sorted(path for path in hidden.iterdir() if path.is_dir())
         if _revalidated(task_dir / "revalidation.json")
     ]
+
+
+def manifest_task_ids(path: str | Path) -> list[str]:
+    """Read the ``task_id`` list of the public task manifest."""
+    document = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise TypeError(f"{path} must be a JSON object")
+    tasks = document.get("tasks")
+    if not isinstance(tasks, list):
+        raise TypeError(f"{path} needs a 'tasks' list")
+    task_ids: list[str] = []
+    for entry in tasks:
+        task_id = entry.get("task_id") if isinstance(entry, Mapping) else None
+        if not isinstance(task_id, str) or not task_id:
+            raise ValueError(f"{path}: every task needs a non-empty 'task_id'")
+        if task_id not in task_ids:
+            task_ids.append(task_id)
+    return task_ids
+
+
+def select_task_ids(store: str | Path, manifest: str | Path, requested: Sequence[str]) -> list[str]:
+    """The manifest's tasks, each of which must be valid in the store."""
+    known = valid_task_ids(store)
+    task_ids = manifest_task_ids(manifest)
+    missing = sorted(set(task_ids) - set(known))
+    if missing:
+        raise ValueError(f"manifest tasks not valid in the store: {', '.join(missing)}")
+    return _select(task_ids, requested, "task")
 
 
 def _revalidated(path: Path) -> bool:
@@ -953,7 +1124,7 @@ def _image_digest(task: Mapping[str, Any]) -> str:
 
 def _run_command(args: argparse.Namespace, deps: Deps) -> int:
     matrix = load_matrix(args.arms)
-    task_ids = _select(valid_task_ids(args.store), args.task, "task")
+    task_ids = select_task_ids(args.store, args.manifest, args.task)
     arms = _select_arms(matrix.arms, args.arm)
     matrix = replace(matrix, arms=tuple(arms))
 
@@ -977,34 +1148,55 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
 
     (args.out / "runs").mkdir(parents=True, exist_ok=True)
     (args.out / "verdicts").mkdir(parents=True, exist_ok=True)
-    client, owns_client = _key_client(deps)
+    client, owns_client = _key_client(args, deps)
     try:
+        if isinstance(client, KeyPool):
+            for run in plan:
+                client.check_budget(float(run.arm.budget["usd"]))
         converted, conversion_errors = _convert_tasks(planned_tasks, planned_executors, args, deps)
         semaphores = {
             provider: threading.Semaphore(limit) for provider, limit in matrix.providers.items()
         }
+        stop = threading.Event()
         failures = 0
+        skipped = 0
+        pending = deque(plan)
         with ThreadPoolExecutor(max_workers=matrix.max_parallel) as pool:
-            futures = [
-                pool.submit(
-                    _run_one,
-                    run,
-                    task_documents[run.task_id],
-                    args,
-                    deps,
-                    client,
-                    semaphores,
-                    converted,
-                    conversion_errors,
-                )
-                for run in plan
-            ]
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as exc:  # noqa: BLE001 - report and keep accounting the rest
-                    failures += 1
-                    print(f"run failed to record: {_redact(str(exc))}", file=sys.stderr)
+            futures: dict[Future[bool], PlannedRun] = {}
+            while pending or futures:
+                while pending and len(futures) < matrix.max_parallel and not stop.is_set():
+                    run = pending.popleft()
+                    future = pool.submit(
+                        _run_one,
+                        run,
+                        task_documents[run.task_id],
+                        args,
+                        deps,
+                        client,
+                        semaphores,
+                        converted,
+                        conversion_errors,
+                        stop,
+                    )
+                    futures[future] = run
+                if not futures:
+                    break
+                done, _ = wait(futures, return_when=FIRST_COMPLETED)
+                for future in done:
+                    futures.pop(future)
+                    try:
+                        ran = future.result()
+                    except KeyPoolExhausted as exc:
+                        stop.set()
+                        print(f"key pool exhausted: {_redact(str(exc))}", file=sys.stderr)
+                    except Exception as exc:  # noqa: BLE001 - report and keep accounting the rest
+                        failures += 1
+                        print(f"run failed to record: {_redact(str(exc))}", file=sys.stderr)
+                    else:
+                        skipped += 0 if ran else 1
+        if stop.is_set():
+            print(f"stopped: {skipped + len(pending)} runs not started", file=sys.stderr)
+            return 1
         return 0 if failures == 0 else 1
     finally:
         if owns_client:
@@ -1013,9 +1205,19 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
                 close()
 
 
-def _key_client(deps: Deps) -> tuple[KeyClient, bool]:
+def _key_client(args: argparse.Namespace, deps: Deps) -> tuple[KeyClient, bool]:
     if deps.key_client is not None:
         return deps.key_client, False
+    if args.keys_file is not None:
+        pool = KeyPool(
+            args.keys_file,
+            args.work / "keys-used.json",
+            args.gateway_url,
+            args.key_budget_usd,
+            http=deps.key_http,
+            sleep=deps.key_sleep,
+        )
+        return pool, False
     url = os.environ.get("FACTORY_KEYS_URL")
     token = os.environ.get("FACTORY_KEYS_TOKEN")
     if not url or not token:
@@ -1060,11 +1262,16 @@ def _run_one(
     semaphores: Mapping[str, threading.Semaphore],
     converted: Mapping[tuple[str, str], Path],
     conversion_errors: Mapping[tuple[str, str], str],
-) -> None:
+    stop: threading.Event,
+) -> bool:
+    if stop.is_set():
+        return False
     semaphore = semaphores[run.arm.provider]
     holder: dict[str, Any] = {}
     key = (run.arm.executor, run.task_id)
     with semaphore:
+        if stop.is_set():
+            return False
         try:
             if key in conversion_errors:
                 raise RuntimeError(conversion_errors[key])
@@ -1078,9 +1285,12 @@ def _run_one(
                 holder=holder,
             )
             _execute_attempt(attempt, args, deps, client)
+        except KeyPoolExhausted:
+            raise
         except Exception as exc:  # noqa: BLE001 - every planned run gets a verdict
             reason = _redact(f"{type(exc).__name__}: {exc}", holder.get("key"))
             _record_infra(run, args, deps, task, reason)
+        return True
 
 
 def _check_command(root: Path) -> int:
@@ -1192,6 +1402,24 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--k", type=int)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument(
+        "--manifest",
+        type=Path,
+        default=DEFAULT_MANIFEST,
+        help="public task manifest (default: tasks/public-v1.manifest.json)",
+    )
+    run.add_argument(
+        "--keys-file",
+        type=Path,
+        default=os.environ.get("FACTORY_KEYS_FILE"),
+        help="pre-minted virtual keys, one per line (default: $FACTORY_KEYS_FILE)",
+    )
+    run.add_argument(
+        "--key-budget-usd",
+        type=float,
+        default=DEFAULT_KEY_BUDGET_USD,
+        help="per-key budget fixed when the pool was minted (default: 2.0)",
+    )
+    run.add_argument(
         "--gateway-url",
         default=os.environ.get("FACTORY_GATEWAY_URL"),
         help="gateway base URL (default: $FACTORY_GATEWAY_URL)",
@@ -1231,8 +1459,10 @@ def main(argv: Sequence[str] | None = None, *, deps: Deps | None = None) -> int:
             return 2
         args.gateway_url = gateway_url
         args.gateway_host = host
-        for name in ("store", "arms", "out", "work"):
+        for name in ("store", "arms", "out", "work", "manifest"):
             setattr(args, name, getattr(args, name).resolve())
+        if args.keys_file is not None:
+            args.keys_file = args.keys_file.resolve()
         return _run_command(args, deps)
     return _check_command(args.root.resolve())
 

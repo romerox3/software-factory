@@ -30,6 +30,7 @@ from .support import (
     add_git_snapshot,
     arm,
     write_arms,
+    write_manifest,
     write_run_doc,
     write_store,
     write_verdict_doc,
@@ -62,6 +63,13 @@ def _deps(
     )
 
 
+def _manifest(store: Path) -> Path:
+    path = store.parent / "public-v1.manifest.json"
+    if not path.exists():
+        write_manifest(path, sorted(task.name for task in (store / "hidden").iterdir()))
+    return path
+
+
 def _run_args(store: Path, arms: Path, out: Path, work: Path, *extra: str) -> list[str]:
     return [
         "run",
@@ -73,6 +81,8 @@ def _run_args(store: Path, arms: Path, out: Path, work: Path, *extra: str) -> li
         str(out),
         "--work",
         str(work),
+        "--manifest",
+        str(_manifest(store)),
         "--gateway-url",
         "http://gateway:4000/v1",
         *extra,
@@ -368,6 +378,8 @@ def _bare_run_args(store: Path, arms: Path, out: Path, work: Path, *extra: str) 
         str(out),
         "--work",
         str(work),
+        "--manifest",
+        str(_manifest(store)),
         *extra,
     ]
 

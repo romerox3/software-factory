@@ -130,6 +130,17 @@ def write_arms(
     return path
 
 
+def write_manifest(path: Path, task_ids: Sequence[str]) -> Path:
+    document = {
+        "schema_version": "1",
+        "datasets": [{"dataset": "fixture", "revision": "main"}],
+        "tasks": [{"task_id": task_id} for task_id in task_ids],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
 class FakeKeys:
     """Records the key lifecycle and returns a fixed spend payload."""
 
