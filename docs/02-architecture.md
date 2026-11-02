@@ -2,6 +2,42 @@
 
 > **Resumen.** Hay tres zonas de confianza: el **generador** (la torre con la RTX 5090: sandboxes Docker y vLLM), el **verificador** (Hetzner, con otras credenciales y los holdouts) y el **gateway** (LiteLLM, por donde pasan los modelos y el dinero). El gateway y el verificador comparten un servidor Hetzner Cloud: ahí las zonas se separan por credenciales, usuario, contenedor y volumen, no por máquina. Un orquestador determinista mueve artefactos entre ellas, siempre con pull desde Hetzner. Los LLM solo viven en los nodos de ejecución y en las señales blandas. En F0 orquestan Harbor y unos scripts; en F1, un runner mínimo de pipelines YAML. Cada componente justifica en §7 la métrica que mueve o la restricción que cumple.
 
+> **Rediseño del 2026-11-02** ([ADR-0012](adr/0012-stage-chain-and-profiles.md)). La factory es una cadena de ocho etapas con perfiles de software intercambiables (§0). Las capas y flujos de §1–§4 describen el núcleo, las etapas E4 (implementar) y E5 (verificar), y siguen valiendo tal cual.
+
+## 0. La cadena de etapas y los perfiles
+
+```mermaid
+flowchart LR
+  E1[E1 Entrada] -->|puerta: qué entra| E2[E2 Spec + escenarios]
+  E2 -->|puerta: spec aprobada| E3[E3 Plan]
+  E2 -.->|proceso aparte| H[(Escenarios ocultos)]
+  E3 -->|puerta en épicas y productos| E4[E4 Implementar]
+  E4 --> E5[E5 Verificar]
+  H -.-> E5
+  E5 -->|accept| E6[E6 Integrar]
+  E5 -->|reject con motivo| E4
+  E6 -->|puerta: merge| E7[E7 Desplegar]
+  H -.-> E7
+  E7 -->|puerta: producción| E8[E8 Operar]
+  E8 -->|señales → tareas| E1
+```
+
+- **Orquestador**: una máquina de estados que lleva cada unidad de trabajo (issue, épica, producto) por las etapas que le tocan según su tipo ([06](06-harness-and-tasks.md) §4). Ningún LLM decide la transición. Las puertas humanas son estados que esperan una aprobación registrada.
+- **Artefacto por etapa**: E2 entrega la spec (OpenSpec) y los escenarios visibles; E3, un plan de tareas con dependencias; E4, un diff por tarea; E5, un veredicto; E6, un PR; E7, una versión desplegada con su resultado de escenarios; E8, entradas nuevas para E1.
+- **Escenarios ocultos**: los escribe un proceso que solo recibe la spec aprobada y no comparte sandbox, credenciales ni historial con el constructor. Viven junto a los tests ocultos, en el almacén que ningún sandbox monta ([ADR-0011](adr/0011-single-host-f0.md)).
+- **Perfil de software**: una pieza con tres partes, entorno, oráculo y despliegue ([06](06-harness-and-tasks.md) §7). E4 pide el entorno al perfil, E5 y E7 piden el oráculo y E7 el despliegue. El resto de la cadena no sabe qué perfil corre.
+
+| Etapa | Pieza | Reutilizar o construir | Fase |
+|---|---|---|---|
+| E1 | Cola de entradas (issues etiquetados, incidentes, ideas) | Reutilizar GitHub Issues | C |
+| E2 | Redactor de spec + escritor de escenarios ocultos | Construir (prompts y validadores) | B |
+| E3 | Planificador de tareas con validador de cobertura | Construir | B |
+| E4 | Contrato de ejecutor, adaptadores, Harbor, gateway | Hecho en la fase A | A |
+| E5 | Verificador antitrampas + oráculo del perfil | Verificador hecho; oráculo de app web por construir | A, B |
+| E6 | Review agéntica + publicador de PRs | Construir fino | C |
+| E7 | Despliegue del perfil + ejecución de escenarios | Construir | B (staging), C |
+| E8 | Lector de señales de producción → E1 | Construir | C |
+
 ## 1. Capas
 
 | # | Capa | Pieza | Reutilizar o construir |

@@ -99,7 +99,7 @@ Lo que no se incorporó, o solo en parte:
   - migraciones y seguridad como clases;
   - los productos completos.
 
-  **Decisión del propietario (2026-11-02): F0 se para y se rediseña la factory entera**, incluida la vía de productos completos. Se conservan, por si se retoman, las 26 tareas Python ya revalidadas (almacén de la torre) y todo el código de `factory/`. El análisis de huecos está en `notas:proyectos/software-factory/analisis/huecos-de-alcance.md`.
+  **Decisión del propietario (2026-11-02): F0 se para y se rediseña la factory entera**, incluida la vía de productos completos. **Cerrado el mismo día**: el propietario aprueba la propuesta ([10](10-rediseno-propuesta.md)): una cadena de ocho etapas, perfiles de software para construir cualquier tipo de software y fases A–D ([ADR-0012](adr/0012-stage-chain-and-profiles.md), [07](07-roadmap.md)). Se conservan, por si se retoman, las 26 tareas Python ya revalidadas (almacén de la torre) y todo el código de `factory/`. El análisis de huecos está en `notas:proyectos/software-factory/analisis/huecos-de-alcance.md`.
 
 ## Decisiones abiertas
 

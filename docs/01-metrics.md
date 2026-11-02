@@ -98,6 +98,18 @@ Responde a la tesis de HumanLayer: «maintainability has no fast oracle» ([wsff
 - **Arranque**: durante F0 no hay conjunto congelado. Las tareas de F0 que tocan `factory/verifier` o `factory/adapters` (F0-12, F0-13) se aceptan con su comando de aceptación y la revisión del orquestador. El congelado v1 y la versión 0.0 de la factory se fijan al terminar F0-18, y M8 rige desde entonces.
 - **Control de coste**: la ejecución completa solo se lanza cuando cambia algo del brazo. Los cambios de documentación no la disparan.
 
+### M9 · Escenarios ocultos que pasan (desde la fase B)
+
+- **Fórmula**: escenarios ocultos que pasan ÷ escenarios ocultos ejecutados, por producto o épica, brazo y repetición. Se publica también la misma tasa sobre los escenarios visibles: la diferencia mide la trampa contra lo visible ([SpecBench](https://arxiv.org/abs/2605.21384)).
+- **Fuente**: el ejecutor de escenarios del perfil sobre lo desplegado ([06](06-harness-and-tasks.md) §7).
+- **Pendiente**: el criterio de paso por paso y por escenario, y el tamaño de muestra, se fijan en B-04.
+
+### M10 · Detección de defectos sembrados por el oráculo del perfil (desde la fase B)
+
+- **Fórmula**: defectos sembrados detectados ÷ defectos sembrados, con su cota inferior al 95 %. Se acompaña de la tasa de falsos fallos sobre las apps de referencia correctas.
+- **Fuente**: variantes rotas a propósito de software correcto (B-05).
+- **Uso**: criterio de admisión del perfil ([06](06-harness-and-tasks.md) §7). Sin M10, M9 no se interpreta.
+
 ## 3. Tamaño de muestra y potencia
 
 Se simuló la potencia de una comparación pareada entre dos brazos sobre las mismas tareas. Supuestos: dificultad por tarea N(0, 1,5) en escala logit, mejora constante en logit entre brazos y prueba t sobre las diferencias medias por tarea. El script está en [`assets/power_sim.py`](assets/power_sim.py). Los resultados dependen de esos supuestos [Probable, simulación propia del 2026-10-31].

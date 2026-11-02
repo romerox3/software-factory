@@ -95,6 +95,15 @@ Cada tarea pertenece a una sola clase. La autonomía se concede por clase ([ADR-
 | **C5 · Dependencias** | Sube versiones dentro de un rango menor o de parche | Hay lockfile; la suite pasa en la base | **Diferida a F3+**: sin F2P y con riesgo de cadena de suministro | No antes de F3 |
 | Excluidas | Autenticación, facturación, infraestructura, migraciones de datos, contratos públicos | — | — | Nunca |
 
+**Tipos de trabajo añadidos en el rediseño** ([ADR-0012](adr/0012-stage-chain-and-profiles.md)). No son clases de tarea sueltas, sino unidades de trabajo que recorren varias etapas:
+
+| Tipo | Descripción | Etapas | Oráculo | Evidencia externa |
+|---|---|---|---|---|
+| **C6 · Migración** | Cambio mecánico en muchos ficheros (librería, API, versión de framework) | E2–E6 | Suite + compilador + linters, por fichero | Google: 74,45 % de 595 cambios generados por LLM; Airbnb: 97 % de ~3 500 ficheros en 4 días [Cierto] |
+| **C7 · Seguridad** | Arreglo de una vulnerabilidad detectada por un escáner | E2–E6 | Escáner que deja de detectarla + tests + fuzzing donde lo haya | CodeMender, Copilot Autofix [Cierto] |
+| **C8 · Épica** | Feature grande en un producto existente | E2–E7 | Escenarios ocultos de la épica sobre lo desplegado | — |
+| **C9 · Producto nuevo** | Software desde cero a partir de una spec (primer perfil: app web interna) | E2–E7 | El oráculo del perfil (§7) | Vibe Code Bench: 61,8 % de recorridos ocultos [Cierto] |
+
 Una clase necesita **≥ 8 tareas** en el conjunto de F0 para reportarse por separado. Con menos, solo cuenta en el agregado [Suposición: con menos de 8 tareas el IC es demasiado ancho para leer nada].
 
 ## 5. Primera comparación (F0)
@@ -143,6 +152,36 @@ Además, su coste medido fue de **~37,6 USD por tarea** (4 tareas reales, 44 ses
 - **Rotativo**: cada split mensual nuevo de los datasets públicos alimenta el conjunto rotativo y las canarias. Desde F1, también los PRs minados del piloto.
 - **Caducidad del congelado**: cuando un brazo nuevo use un modelo con un corte posterior a las tareas del congelado, ese congelado deja de servir para ese brazo y se crea uno nuevo (v2) con splits posteriores.
 - **Auditoría**: cada trimestre una persona revisa 10 tareas al azar (spec, F2P y gold), siguiendo la lección de la auditoría de OpenAI sobre SWE-bench Verified ([post](https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/)).
+
+## 7. Perfiles de software y sus oráculos
+
+Un **perfil** agrupa lo que depende del tipo de software ([ADR-0012](adr/0012-stage-chain-and-profiles.md)):
+
+| Parte | Qué define | Ejemplo en app web |
+|---|---|---|
+| Entorno | Cómo se construye y ejecuta | Contenedores de app + base de datos, con datos semilla |
+| Oráculo | Cómo se comprueba que funciona | Escenarios ocultos que recorre un agente de navegador sobre la app desplegada |
+| Despliegue | Dónde y cómo se publica | Staging en la torre; en la fase C, el del piloto tras una feature flag |
+
+**Admisión de un perfil** (fase D de [07](07-roadmap.md)):
+- su oráculo detecta ≥ 90 % de los **defectos sembrados** (variantes de software correcto con un fallo puesto a propósito);
+- la concordancia con revisión humana es ≥ 85 %;
+- la cota de trampa en sus canarias es ≤ 10 %.
+
+Mientras no se cumpla, E5 de ese perfil lleva puerta humana.
+
+**Oráculo del perfil app web (fase B)**:
+1. **Escenarios**: recorridos de usuario en lenguaje natural con resultado esperado comprobable («crear un pedido con dos líneas y ver el total correcto en el listado»). Los visibles van en la spec. Los ocultos los escribe un proceso aparte a partir de la spec aprobada, sin acceso al código ni al constructor.
+2. **Ejecución**: un agente de navegador recorre cada escenario sobre la app desplegada y da un veredicto por paso. Un escenario pasa si pasan todos sus pasos.
+3. **Calibración**: antes de confiar en el oráculo se mide con apps de referencia correctas (no debe dar falsos fallos) y con defectos sembrados (debe detectarlos). La concordancia entre evaluadores de navegador puede ser muy baja: Vibe Code Bench informa de entre el 31,8 y el 93,6 % por paso según el evaluador [Cierto]. Por eso M10 y la auditoría humana van antes que cualquier resultado de la factory.
+4. **Trampas propias del perfil**:
+   - detectar el agente de navegador y servirle otra cosa;
+   - datos semilla preparados para los escenarios visibles;
+   - rutas que solo existen en staging.
+
+   Se cubren con canarias de producto y con escenarios ocultos que usan datos distintos de los visibles.
+
+**Perfiles candidatos para la fase D** y fuerza de su oráculo: API o servicio (tests de contrato y escenarios contra la API, fuerte), CLI o librería (suite y comparación con una implementación de referencia, fuerte), pipeline de datos (salidas frente a datos de referencia, fuerte si los hay), producto con IA (evaluaciones y jueces, medio), móvil o escritorio (recorridos con emulador, medio), juegos, UX y contenido (personas, débil).
 
 ## Decisiones abiertas
 

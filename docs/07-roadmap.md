@@ -1,82 +1,85 @@
 # 07 · Roadmap
 
-> **En pausa desde el 2026-11-02.** El propietario decide rediseñar la factory entera (09 §3, «El diseño solo cubre un tramo de la factory»). Este roadmap queda como referencia hasta que lo sustituya el rediseño.
-
-> **Resumen.** Cuatro fases, cada una con un criterio de salida y un criterio de abandono medibles:
-> - **F0**: harness, ~30 tareas públicas recientes (Python y TS) y la baseline de 6 brazos. Sin datos del cliente.
-> - **F1**: verificador con holdouts y canarias, más pipeline issue→PR en borrador para C1 **sobre el piloto**.
-> - **F2**: intensidad del harness por modelo (best-of-n, cascada, revisor de otro vendor) y modelos locales para las clases baratas.
-> - **F3**: auto-merge por clase según el ADR-0008, condicionado sobre todo al volumen.
+> **Resumen.** Rediseño del 2026-11-02 ([ADR-0012](adr/0012-stage-chain-and-profiles.md)). Cuatro fases, cada una con un criterio de salida y un criterio de abandono medibles:
+> - **A · Núcleo**: medir las etapas implementar y verificar con las tareas públicas ya revalidadas. Es la antigua F0, recortada.
+> - **B · De la spec al producto**: construir **apps web internas desde cero** a partir de una spec aprobada, con escenarios ocultos y un agente de navegador como oráculo. Primer perfil de software. Sin código del cliente.
+> - **C · Cadena completa en el piloto**: las ocho etapas sobre los repos reales (issues, épicas, migraciones), con despliegue tras feature flags y vuelta desde producción.
+> - **D · Más perfiles**: API o servicio, CLI o librería, pipeline de datos y producto con IA, uno a uno.
 >
-> El backlog de F0 son 21 tareas que se pueden despachar sin decisiones de arquitectura pendientes, cada una con un comando de aceptación. Todas las duraciones son estimaciones [Suposición].
+> Dos líneas atraviesan todas las fases: la intensidad del harness por modelo y el auto-merge por etapa, tipo de trabajo y perfil. Todas las duraciones son estimaciones [Suposición].
 
 ## 1. Fases
 
-### F0 · Harness y baseline
+### A · Núcleo: implementar y verificar
 
-- **Objetivo**: medir los seis brazos de [06](06-harness-and-tasks.md) §5 sobre ~30 tareas públicas recientes ([06](06-harness-and-tasks.md) §2.1). F0 mide la factory, no qué modelo es mejor: las comparaciones entre modelos distintos se publican con la etiqueta «posible contaminación» ([06](06-harness-and-tasks.md) §3, decisión del 2026-11-01), con un verificador v0 aislado. F0 no usa código del piloto, salvo el historial git para la baseline de M4 (F0-16), que se calcula en local sin pasar por ningún proveedor.
+- **Objetivo**: medir los seis brazos de [06](06-harness-and-tasks.md) §5 sobre las tareas públicas ya revalidadas ([06](06-harness-and-tasks.md) §2.1). Mide la factory, no qué modelo es mejor: las comparaciones entre modelos distintos llevan la etiqueta «posible contaminación» ([06](06-harness-and-tasks.md) §3).
+- **Punto de partida (2026-11-02)**: 26 tareas Python válidas [Cierto]; 0 TS por fallos de la revalidación en monorepos grandes ([09](09-open-questions.md)). Backlog en §2: casi todo hecho.
+- **Duración estimada**: 1–2 semanas [Suposición].
+
+| Tipo | Criterio | Cómo se mide |
+|---|---|---|
+| **Salida** | ≥ 15 tareas válidas (zona intermedia de la antigua F0 aceptada). Las TS se intentan con un tope de 1 día; si no salen ≥ 8, el informe declara que la etapa solo está medida en Python | Inventario del almacén |
+| **Salida** (salud del harness) | ≥ 95 % de las ejecuciones producen una salida de contrato válida y `error_infra` ≤ 5 % (cada `error_infra` se repite hasta 2 veces) | `check-jsonschema` sobre `runs/` |
+| **Salida** | Verificador reproducible: ≥ 99 % de veredictos idénticos al repetir 100 veredictos al azar | Reverificación |
+| **Salida** | **Falsos `accept`**: ≤ 1 en una auditoría de 30 `accept` al azar, y ≥ 9/10 en 10 `reject`/`cheat_suspected` | Hoja de auditoría |
+| **Salida** | Informe con pass@1, pass^k, M1 y M7a–c por brazo, con IC | `reports/a-baseline.md` |
+| **Abandono** | El mejor brazo saca pass@1 < 15 % → revisar el harness con 5 tareas a mano antes de culpar al modelo | Informe |
+| **Abandono** | ≥ 4 falsos `accept` de 30 tras 2 iteraciones del verificador → la verificación automática no es viable con estas suites: parar y replantear | Auditoría |
+
+### B · De la spec al producto: perfil app web
+
+- **Objetivo**: que la factory construya una app web interna desde cero (login, formularios, listados, flujos de negocio) a partir de una spec aprobada, la despliegue en staging y la compruebe con escenarios ocultos. Cubre E2, E3, E4, E5 y E7 en staging.
+- **Por qué antes que el piloto**: no necesita código del cliente, prueba la parte nueva más arriesgada (el oráculo de producto) y es lo que más se parece a «construir cualquier software».
+- **Material**: 5 specs de apps internas pequeñas escritas por el orquestador y aprobadas por el propietario, más la app interna real que elija el propietario. Las specs de [Vibe Code Bench](https://arxiv.org/abs/2603.04601) no son públicas [Probable], así que no hay conjunto externo con el que calibrar.
 - **Duración estimada**: 4–6 semanas [Suposición].
 
 | Tipo | Criterio | Cómo se mide |
 |---|---|---|
-| **Salida** | ≥ 30 tareas públicas revalidadas en nuestro entorno, no sintéticas y de las fuentes de [06](06-harness-and-tasks.md) §2.1: F2P no vacío, gold 3/3, base 3/3 en rojo y detector de fuga en verde. Al menos 8 son TS | Inventario del almacén de tareas |
-| **Salida** (salud del harness, no calidad) | ≥ 95 % de las 840 ejecuciones producen una salida de contrato válida contra el schema y la tasa final de `error_infra` es ≤ 5 % (cada `error_infra` se repite hasta 2 veces) | `check-jsonschema` sobre `runs/` |
-| **Salida** | Verificador reproducible: ≥ 99 % de veredictos idénticos al repetir 100 veredictos al azar | Script de reverificación |
-| **Salida** | **Falsos `accept`**: en una auditoría de 30 veredictos `accept` elegidos al azar, ≤ 1 es incorrecto (cota superior al 95 % ≈ 15 %), y la concordancia en 10 `reject`/`cheat_suspected` es ≥ 9 de 10. La auditoría la hace el orquestador con el método de F0-19, y el propietario solo revisa los casos dudosos (decisión del 2026-11-01) | Hoja de auditoría |
-| **Salida** | Informe con pass@1, pass^k, M1 y M7a–c por brazo, con IC, y baseline humana de M4 calculada sobre 12 meses del piloto | `reports/f0-baseline.md` |
-| **Zona intermedia** | Entre 15 y 29 tareas válidas → se completa con el split `js` de MultiLang y con los splits mensuales que se vayan publicando. Si en 4 semanas sigue < 30, F0 continúa con las que haya y el informe declara el efecto mínimo detectable con ese n (`power_sim.py`) | F0-17 |
-| **Abandono** | < 15 tareas válidas tras revalidar → **los datasets públicos no sirven en nuestro entorno**: se pasa a minar el piloto con la receta de [06](06-harness-and-tasks.md) §2.2, con S3 y S4 ya confirmados | F0-17 |
-| **Abandono** | El mejor brazo saca pass@1 < 15 % → **revisar el harness** (snapshot, prompt, red, entorno) con 5 tareas a mano antes de culpar al modelo. Si tras la revisión sigue < 15 %, las tareas son demasiado difíciles para F1 con C1 | Informe F0 |
-| **Zona intermedia** | 2 o 3 falsos `accept` de 30 → una iteración del verificador y una auditoría nueva de 30 `accept` distintos | Auditoría |
-| **Abandono** | ≥ 4 falsos `accept` de 30 tras 2 iteraciones del verificador → **la verificación automática no es viable en estos repos**: parar y replantear (tests insuficientes en el piloto) | Auditoría |
+| **Salida** (el oráculo funciona) | El ejecutor de escenarios detecta ≥ 90 % de los **defectos sembrados** (flujos rotos a propósito en apps correctas) y da como buenos ≥ 95 % de los escenarios en las apps de referencia | M10 sobre ≥ 40 defectos |
+| **Salida** (el oráculo es fiable) | Concordancia ≥ 85 % con la revisión humana en 50 pasos de escenario al azar | Auditoría |
+| **Salida** (la factory construye) | Al menos un brazo pasa ≥ 60 % de los escenarios ocultos de media en las 6 apps, con k = 3 (referencia externa: 61,8 % en Vibe Code Bench [Cierto]) | M9 |
+| **Salida** | Antitrampas: 0 accesos a escenarios ocultos desde el constructor en todas las ejecuciones; la diferencia entre escenarios visibles y ocultos se publica | Logs del sandbox; M9 visibles frente a ocultos |
+| **Salida** | Revisión humana de arquitectura de las apps del mejor brazo sin bloqueantes, y M7a–c dentro de lo comparable | Hoja de revisión |
+| **Zona intermedia** | Detección de defectos entre 75 y 90 % → una iteración del ejecutor de escenarios y otra medición con defectos nuevos | M10 |
+| **Abandono** | Detección < 75 % tras 2 iteraciones → el oráculo de navegador no sirve: el perfil app web pasa a escenarios deterministas (Playwright escritos por el escritor de escenarios) y se repite la fase | M10 |
+| **Abandono** | El mejor brazo pasa < 20 % de los escenarios ocultos → revisar spec, plan y entorno en 2 apps a mano antes de culpar al modelo | M9 |
 
-### F1 · Verificador completo y pipeline issue→PR en borrador (una clase: C1)
+### C · Cadena completa en el piloto
 
-- **Objetivo**: los issues etiquetados `factory:C1` **del piloto** producen PRs en borrador verificados con holdouts, y las canarias miden la propensión a hacer trampa.
-- **Requisito de entrada**: S3 y S4 están confirmados por el propietario desde el 2026-11-01 ([09](09-open-questions.md)). El verificador de Hetzner tiene que tener ya el mirror de los repos piloto, con Docker rootless y un volumen que no vean los demás servicios del host ([02](02-architecture.md) §2). Si no se puede, el verificador pasa a otra máquina antes de que entre código del cliente.
-- **Duración estimada**: 6–10 semanas [Suposición].
+- **Objetivo**: las ocho etapas sobre los repos del piloto. Issues (antigua F1), épicas y migraciones recorren la cadena; el despliegue va a staging tras una feature flag, y las señales de producción vuelven a E1.
+- **Requisito de entrada**: revisar el aislamiento de [ADR-0011](adr/0011-single-host-f0.md) antes de meter código del cliente ([09](09-open-questions.md)), con S3 y S4 confirmados (2026-11-01).
+- **Duración estimada**: 8–12 semanas [Suposición].
 
 | Tipo | Criterio | Cómo se mide |
 |---|---|---|
-| **Salida** | ≥ 20 PRs en borrador de C1 abiertos desde issues reales y revisados por personas | GitHub |
-| **Salida** | M3 ≥ 50 % sobre esos 20 PRs | Diff entre lo verificado y lo fusionado |
-| **Salida** | ≥ 30 **tareas-canaria distintas** (construidas a partir de tareas públicas, sin datos del cliente), en lotes dedicados fuera del flujo de PRs, en el brazo de F1, con cota superior al 95 % de M5 ≤ 10 % (0 trampas en 30). Coste de A1: 30–90 USD [Suposición] | Veredictos de canarias |
-| **Salida** | La prueba `leak-holdout-path` falla siempre (0 lecturas de holdouts desde el generador) en cada versión | CI del harness |
-| **Salida** | Mediana y p90 de M6 reportadas, revisión humana incluida | Eventos de GitHub |
-| **Zona intermedia** | M3 entre 30 y 50 % tras 20 PRs → se revisan los specs y se abren 10 PRs más. Si M3 sigue < 50 % sobre los 30, se aplica el abandono | M3 |
-| **Abandono** | M3 < 30 % tras 20 PRs (o < 50 % tras 30) → no pasar a F2. Revisar la calidad de los specs y si C1 es la clase adecuada | M3 |
-| **Abandono** | Cota superior de M5 > 25 % en **todos** los brazos → ninguna autonomía con estos modelos; se mantiene la factory como generador de borradores | M5 |
-| **Abandono** | La mediana del tiempo de revisión por PR ≥ la mediana del tiempo estimado de hacerlo a mano → parar: la factory no ahorra trabajo | **Formulario de revisión**: al cerrar cada PR de la factory, el revisor deja un comentario con la plantilla `review-minutes: N` y `manual-estimate-minutes: M`, que se exporta a `prs/*.jsonl`. Un PR sin formulario no cuenta, y si faltan en > 20 % de los PRs el criterio queda «sin dato» y se pregunta al propietario |
+| **Salida** (issues) | ≥ 20 PRs en borrador desde issues reales, revisados por personas, con M3 ≥ 50 % | GitHub |
+| **Salida** (épicas) | ≥ 3 épicas recorren E2–E7 con escenarios ocultos, y el propietario acepta la entrega de al menos 2 | Hoja de entrega |
+| **Salida** (migraciones) | Una migración real cubre ≥ 80 % de los ficheros afectados con la suite en verde y revisión humana | Diff y CI |
+| **Salida** (canarias) | ≥ 30 tareas-canaria distintas, con cota superior al 95 % de M5 ≤ 10 % | Veredictos de canarias |
+| **Salida** (vuelta desde producción) | ≥ 5 tareas de E1 nacen de señales de producción y llegan a PR | Trazas de E8 → E1 |
+| **Salida** | Mediana y p90 de M6, con la revisión humana incluida | Eventos de GitHub |
+| **Abandono** | M3 < 30 % tras 20 PRs → revisar specs y tipo de trabajo antes de seguir | M3 |
+| **Abandono** | La mediana del tiempo de revisión por PR ≥ la del tiempo estimado a mano → parar: la factory no ahorra trabajo | Formulario de revisión (`review-minutes`, `manual-estimate-minutes`) |
 
-### F2 · Intensidad del harness por modelo y modelos locales
+### D · Más perfiles
 
-- **Objetivo**: elegir, **por modelo**, la estrategia (un intento, best-of-n, cascada de [ADR-0010](adr/0010-escalation-on-verified-failure.md) o reintento con motivo) que minimiza `M1.total` sin perder M2. Añadir un revisor de otro vendor como señal blanda y habilitar modelos locales para C4.
-- **Duración estimada**: 6–8 semanas [Suposición].
+- **Objetivo**: admitir perfiles nuevos uno a uno. Orden por decidir ([09](09-open-questions.md)); candidatos: API o servicio, CLI o librería, pipeline de datos y producto con IA.
+- **Criterio de admisión de un perfil**:
+  - su oráculo detecta ≥ 90 % de los defectos sembrados;
+  - la concordancia con revisión humana es ≥ 85 %;
+  - la cota de M5 en sus canarias es ≤ 10 %.
 
-| Tipo | Criterio | Cómo se mide |
-|---|---|---|
-| **Salida** | Sobre ≥ 50 tareas con k = 5 (o ≥ 80 con k = 3), al menos una variante cumple la regla única de coste de [01](01-metrics.md) M1: `M1.total` ≤ 50 % del intento único y M2 no inferior con Δ = 10 puntos | Comparación pareada |
-| **Salida** | Un brazo con modelo local en C4 cumple la misma regla frente al baseline, sobre ≥ 8 tareas C4 minadas con la receta de `K_gold` ([06](06-harness-and-tasks.md) §4) | M1, M2 |
-| **Salida** | El juez de otro vendor concuerda con las personas en ≥ 75 % de una muestra de 30 ([05](05-verification-design.md)) | Auditoría |
-| **Abandono** | Ninguna variante supera al intento único tras 2 iteraciones → se queda el intento único y se pasa a F3 con él | Comparación pareada |
-| **Abandono** | El critic o el cross-check no se correlacionan con M2 (ρ < 0,3) → no se integran | Correlación |
+  Los perfiles con oráculo débil (UX, juegos, contenido) se admiten solo con puerta humana en E5.
 
-### F3 · Auto-merge por clase
+### Líneas transversales
 
-- **Objetivo**: que al menos una clase (previsiblemente C1 o C4) entre en auto-merge con el criterio de [ADR-0008](adr/0008-gates-and-auto-merge.md).
-- **Duración**: depende del volumen de la clase. Con pocas decenas de PRs al mes, llegar a 150 cambios puede llevar 2–4 trimestres [Suposición].
+- **Intensidad del harness por modelo** (antigua F2): elegir por modelo entre un intento, best-of-n, cascada de [ADR-0010](adr/0010-escalation-on-verified-failure.md) o reintento con motivo, por coste por cambio aceptado. Empieza con los datos de la fase A.
+- **Auto-merge** (antigua F3, [ADR-0008](adr/0008-gates-and-auto-merge.md)): por etapa, tipo de trabajo y perfil. Depende sobre todo del volumen: llegar a 150 cambios de una misma clase puede llevar 2–4 trimestres [Suposición].
+- **Auto-mejora**: todo PR que toque `prompts/`, `pipelines/`, `factory/adapters/`, `factory/verifier/`, los perfiles o la configuración de modelos ejecuta el conjunto congelado con el brazo afectado (M8). M8 rige desde que la fase A congela el conjunto v1.
 
-| Tipo | Criterio | Cómo se mide |
-|---|---|---|
-| **Salida** | Una clase cumple las 6 condiciones del ADR-0008 y pasa 8 semanas en auto-merge sin que salte ninguna condición de salida | M3, M4, M5 y M7 |
-| **Abandono** | Menos de 150 cambios de la clase en 6 meses → se mantiene el merge humano (la factory sigue siendo útil como generadora de borradores) | Volumen |
-| **Abandono** | Dos salidas automáticas del modo en 3 meses → la clase vuelve a merge humano indefinidamente y se revisa el verificador | Eventos |
+## 2. Backlog de la fase A (antes «F0»)
 
-### Auto-mejora (todas las fases desde F0)
-
-Todo PR que toque `prompts/`, `pipelines/`, `factory/adapters/`, `factory/verifier/` o la configuración de modelos ejecuta el conjunto congelado con el brazo afectado (M8, [01](01-metrics.md)). Se fusiona solo si pasa la regla de no-inferioridad de M8. **Arranque**: en F0 aún no hay congelado. F0-12 y F0-13 se aceptan con su comando y la revisión del orquestador, y M8 rige desde que F0-18 fija el congelado v1 y la versión 0.0.
-
-## 2. Backlog de F0
+Los identificadores `F0-NN` se mantienen. Estado a 2026-11-02: F0-01 a F0-16 hechas; F0-17 con 26 tareas Python y TS pendiente; F0-18 a F0-21 pendientes.
 
 **Convenciones de despacho** (ver [CLAUDE.md](../CLAUDE.md)):
 - **Peón**: OpenCode con GLM o DeepSeek a través del gateway, en un worktree aislado. Recibe la spec tal cual. Nunca recibe datos del almacén privado: se le dan fixtures públicos.
@@ -104,10 +107,10 @@ Cada tarea se acepta cuando **su comando de aceptación termina con exit 0 en un
 | **F0-14** | Normalizador de los 4 formatos de trayectoria → `trajectory-event` | `factory/normalize/**`, `tests/normalize/**` (con trayectorias reales de F0-04 anonimizadas) | `make check`: cada evento valida contra el schema y el contador de «no mapeados» es 0 en las muestras | — | Sin OTel GenAI | F0-04, F0-01 | Peón | 1 día |
 | **F0-15** | Métricas: M1 (gen y total, con k = 3), M2 (pass@1, pass^3, pass^5), M7a–c, IC por bootstrap pareado, no-inferioridad con Δ, `audit.py` y `report --check`, e informe en `.md` y `.json` | `factory/metrics/**`, `tests/metrics/**` | `make check` con runs y veredictos sintéticos de resultado conocido | Las cifras coinciden con un cálculo a mano en el test | Sin dashboard | F0-01 | Peón | 1 día |
 | **F0-16** | Baseline humana de M4: SZZ básico (PyDriller) sobre 12 meses de PRs humanos | `factory/metrics/szz.py`, `tests/metrics/test_szz.py` | `make check` con un repo fixture con un bug introducido y su fix; después el orquestador lo ejecuta sobre el piloto | La regresión del fixture se atribuye al commit correcto | — | F0-01 | Peón (código) + orquestador (ejecución) | 1 día |
-| **F0-17** | Importar y revalidar las 30 tareas públicas: fijar la revisión de cada dataset, anotar en el informe las fechas de corte de los modelos de los brazos ([06](06-harness-and-tasks.md) §3), importar (F0-05), revalidar en la torre (F0-10) y auditar 10 al azar | `tasks/public-v1.manifest.json` (en el repo) + parte oculta en el almacén del verificador | `uv run python -m factory.tasks.inventory --store <almacén> --min-valid 30 --min-lang ts=8` termina con exit 0 (o la zona intermedia de §1) | El manifiesto pasa el hook de pre-commit y no contiene contenido oculto | Sin specs reescritos | F0-05, F0-10, F0-12 | Orquestador (audita las 10 con el método de F0-19; el propietario solo ve las dudosas) | 1–2 días |
-| **F0-18** | Ejecutar la matriz: 30 tareas × 6 brazos × k (840 runs) con concurrencia por proveedor ([06](06-harness-and-tasks.md) §5) y verificación en la torre ([ADR-0011](adr/0011-single-host-f0.md)); congelar el conjunto v1 | `factory/run_matrix.py` + datos privados | `uv run python -m factory.run_matrix --check runs/ --expect 840` termina con exit 0: todos los runs tienen veredicto, ≥ 95 % de salidas válidas y `error_infra` ≤ 5 % | Los `error_infra` se reintentan y no cuentan como fallo del brazo | — | F0-12…F0-17, F0-07, F0-21 | Orquestador | 2–3 días (pared) |
+| **F0-17** | Importar y revalidar las 30 tareas públicas: fijar la revisión de cada dataset, anotar en el informe las fechas de corte de los modelos de los brazos ([06](06-harness-and-tasks.md) §3), importar (F0-05), revalidar en la torre (F0-10) y auditar 10 al azar | `tasks/public-v1.manifest.json` (en el repo) + parte oculta en el almacén del verificador | `uv run python -m factory.tasks.inventory --store <almacén> --min-valid 15` termina con exit 0 (§1, fase A) | El manifiesto pasa el hook de pre-commit y no contiene contenido oculto | Sin specs reescritos | F0-05, F0-10, F0-12 | Orquestador (audita las 10 con el método de F0-19; el propietario solo ve las dudosas) | 1–2 días |
+| **F0-18** | Ejecutar la matriz: las tareas válidas × 6 brazos × k con concurrencia por proveedor ([06](06-harness-and-tasks.md) §5) y verificación en la torre ([ADR-0011](adr/0011-single-host-f0.md)); congelar el conjunto v1 | `factory/run_matrix.py` + datos privados | `uv run python -m factory.run_matrix --check runs/` termina con exit 0: todos los runs tienen veredicto, ≥ 95 % de salidas válidas y `error_infra` ≤ 5 % | Los `error_infra` se reintentan y no cuentan como fallo del brazo | — | F0-12…F0-17, F0-07, F0-21 | Orquestador | 2–3 días (pared) |
 | **F0-19** | El orquestador audita 40 veredictos al azar (30 `accept`, 10 `reject`/`cheat_suspected`) y reverifica 100. **Método**: por cada veredicto, leer spec, diff, gold y tests ocultos, y decidir si el diff resuelve el issue y no solo pasa los tests. Si hay duda, escribir una prueba extra y ejecutarla en un contenedor sin red. Las dudas se le preguntan al propietario con el formulario (regla 10 de `CLAUDE.md`). Después de leer la parte oculta, el auditor no cambia specs ni prompts: una tarea mala se descarta, no se reescribe | Hoja en `factory-pilot-data/` + `factory/metrics/audit.py` (en F0-15) | `uv run python -m factory.metrics.audit --sheet ../factory-pilot-data/audit-f0.csv` termina con exit 0 si ≤ 1 falso `accept`, ≥ 9/10 en los rechazos y reproducibilidad ≥ 99 % | — | — | F0-18 | Orquestador + propietario (solo las dudosas, ~15–30 min [Suposición]) | 1 día |
-| **F0-20** | Informe de F0 y decisión de F1 (sigue, cambia de rumbo o para, según §1) + volcado a doc-rag | `reports/f0-baseline.md` (sin datos del piloto) | `make check && .githooks/pre-commit` termina con exit 0, y `uv run python -m factory.metrics.report --check reports/f0-baseline.md` comprueba que hay una línea con valor por cada criterio de salida, de zona intermedia y de abandono de F0 | — | — | F0-15, F0-16, F0-19 | Orquestador | 4 h |
+| **F0-20** | Informe de la fase A y decisión de pasar a B (sigue, cambia de rumbo o para, según §1) + volcado a doc-rag | `reports/a-baseline.md` (sin datos del piloto) | `make check && .githooks/pre-commit` termina con exit 0, y `uv run python -m factory.metrics.report --check reports/a-baseline.md` comprueba que hay una línea con valor por cada criterio de salida y de abandono de la fase A | — | — | F0-15, F0-16, F0-19 | Orquestador | 4 h |
 | **F0-21** | Separar el verificador del generador en la torre ([ADR-0011](adr/0011-single-host-f0.md)): almacén de tareas en una carpeta 700 que ningún sandbox monta, contenedor efímero de verificación sin red y equipo `factory-verifier` en el gateway | `infra/verifier/**` (sin hosts: los valores van en `factory-pilot-data/`) | `bash infra/verifier/isolation-check.sh` termina con exit 0. Comprueba que desde un sandbox solo se llega al puerto del gateway, que ningún contenedor de agente monta el almacén, que el contenedor de verificación no tiene red y que las keys del agente no pueden emitir keys del equipo verificador | Tesis 2 por proceso y montaje en F0; se revisa antes de F1 | Sin alta disponibilidad ni aislamiento por máquina | F0-02, F0-07, F0-12 | Orquestador | 0,5 días |
 
 **Camino crítico**: F0-01 → F0-02 → F0-03 → F0-04 → (F0-13, F0-14) y F0-01 → (F0-06, F0-08, F0-09, F0-11) → (F0-05, F0-10) → F0-12 → (F0-17, F0-21) → F0-18 → F0-19 → F0-20.
@@ -118,8 +121,23 @@ Cada tarea se acepta cuando **su comando de aceptación termina con exit 0 en un
 - No hay gasto real en F0. A1 consume la suscripción de Anthropic del propietario (90–270 USD a precio de lista [Suposición]) y los brazos de GLM, el coding plan de z.ai. El coste se paga en cuota y en días de reloj ([06](06-harness-and-tasks.md) §5).
 - ~1 jornada humana entre la auditoría de tareas y la de veredictos.
 
+## 3. Backlog de la fase B (esbozo)
+
+Se detalla como specs despachables cuando la fase A cierre. Las piezas, en orden:
+
+| ID | Pieza | Quién |
+|---|---|---|
+| B-01 | Elegir la app interna real y escribir las 5 specs de apps pequeñas con sus escenarios visibles | Orquestador + aprobación del propietario |
+| B-02 | Perfil app web: entorno (app + base de datos en contenedores), despliegue en staging en la torre y contrato del perfil ([06](06-harness-and-tasks.md) §7) | Sonnet (diseño) + peones |
+| B-03 | Escritor de escenarios ocultos: un proceso aparte que, a partir de la spec aprobada, escribe escenarios que el constructor nunca ve | Sonnet + revisión del orquestador |
+| B-04 | Ejecutor de escenarios: agente de navegador sobre la app desplegada, con veredicto por paso | Sonnet + peones |
+| B-05 | Defectos sembrados: variantes rotas de las apps de referencia para medir M10 | Peones |
+| B-06 | Etapas E2 y E3 automatizadas: de la spec aprobada al plan de tareas | Peones |
+| B-07 | Ejecución: 6 apps × brazos × k = 3, auditoría y revisión de arquitectura | Orquestador + propietario |
+
 ## Decisiones abiertas
 
-- Fecha de inicio de F0 y disponibilidad del propietario para las tareas humanas (F0-03, F0-07, F0-17, F0-19).
-- Si F1 empieza con C1 o con C4 (más segura y con peor señal de valor), según los resultados de F0 por clase.
-- Si F2 incluye OpenHands SDK como brazo adicional.
+- Qué app web interna real se usa en la fase B.
+- Si el ejecutor de escenarios es un agente de navegador (como Vibe Code Bench) o scripts deterministas; se decide con los datos de B-04 y B-05.
+- Qué perfil va después de app web (fase D).
+- Si la fase C empieza con issues sueltos o con una épica.

@@ -1,12 +1,12 @@
 # CLAUDE.md — mapa del repo
 
-Software factory con agentes de IA: un pipeline determinista que convierte tareas especificadas en cambios de código **verificados**, con ejecutores intercambiables (Claude Code, Codex CLI, OpenCode, mini-swe-agent) detrás de un contrato único y de un gateway LiteLLM. El objetivo es L4 *por clase de tarea*, ganada con datos. Licencia Apache-2.0. Hoy el repo solo tiene diseño, esquemas y spikes; el código de `factory/` empieza en F0 ([docs/07-roadmap.md](docs/07-roadmap.md)).
+Software factory con agentes de IA: una cadena determinista de ocho etapas (entrada, spec, plan, implementar, verificar, integrar, desplegar y operar) que lleva el trabajo de la intención al producto en producción, para cualquier tipo de software mediante **perfiles** intercambiables. Cada etapa tiene su oráculo y su puerta humana ([ADR-0012](docs/adr/0012-stage-chain-and-profiles.md)). Ejecutores intercambiables (Claude Code, Codex CLI, OpenCode, mini-swe-agent) detrás de un contrato único y de un gateway LiteLLM. El objetivo es L4 *por etapa, tipo de trabajo y perfil*, ganada con datos. Licencia Apache-2.0. Hay código del núcleo (implementar y verificar) en `factory/`; el roadmap va por fases A–D ([docs/07-roadmap.md](docs/07-roadmap.md)).
 
 ## Carpetas
 
 | Ruta | Qué es |
 |---|---|
-| `docs/00-vision.md` … `09-open-questions.md` | Diseño. Se leen en orden. Cada documento empieza con un resumen y termina con «Decisiones abiertas» |
+| `docs/00-vision.md` … `10-rediseno-propuesta.md` | Diseño. Se leen en orden. Cada documento empieza con un resumen y termina con «Decisiones abiertas». El 10 es la propuesta de rediseño aprobada el 2026-11-02 |
 | `docs/adr/NNNN-*.md` | Una decisión por fichero (contexto, opciones, decisión, consecuencias, cómo revertir) |
 | `docs/research/` | Investigación de partida. **No se edita**; las correcciones van al 09 §4 |
 | `docs/assets/` | Scripts de apoyo a los documentos (p. ej. la simulación de potencia) |

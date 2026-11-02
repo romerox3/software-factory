@@ -1,6 +1,6 @@
 # 10 · Propuesta de rediseño: la factory completa
 
-> **Estado**: borrador para que el propietario lo apruebe (2026-11-02). Si lo aprueba, se reescriben 00, 02, 06 y 07 siguiendo esta propuesta. Lo que cambia y por qué está en [09](09-open-questions.md), «El diseño solo cubre un tramo de la factory».
+> **Estado**: **aprobada** por el propietario el 2026-11-02 ([ADR-0012](adr/0012-stage-chain-and-profiles.md)). Ya está aplicada en 00, 01, 02, 06 y 07. Lo que cambia y por qué está en [09](09-open-questions.md), «El diseño solo cubre un tramo de la factory».
 
 ## 1. Qué es la factory, en un párrafo
 
