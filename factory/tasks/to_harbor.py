@@ -12,6 +12,7 @@ from typing import Any
 
 import jsonschema
 
+from factory.tasks.import_hf import REBENCH_ENV_BIN, REBENCH_ENV_PREFIX
 from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -133,6 +134,8 @@ def _build_dockerfile(task: dict[str, Any], workdir: str, has_snapshot: bool) ->
         lines.append(f"RUN cd {shlex.quote(workdir)} && git checkout -qf {commit} && rm -rf .git")
     if has_snapshot:
         lines.append(f"COPY {SNAPSHOT_GIT_NAME} {workdir}/.git")
+    if task["visible_tests"]["command"].startswith(REBENCH_ENV_PREFIX):
+        lines.append(f"ENV PATH={REBENCH_ENV_BIN}:$PATH")
     lines.append(f"WORKDIR {workdir}")
     return "\n".join(lines) + "\n"
 

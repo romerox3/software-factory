@@ -33,6 +33,8 @@ VERIFIER_SCHEMA_PATH = REPO_ROOT / "schemas" / "verifier-task.schema.json"
 JUNIT_PATH = "/logs/verifier/junit.xml"
 DEFAULT_VERIFIER_TIMEOUT_SEC = 600
 DEFAULT_REBENCH_TEST_COMMAND = "python -m pytest -q"
+REBENCH_ENV_BIN = "/opt/conda/envs/testbed/bin"
+REBENCH_ENV_PREFIX = f"export PATH={REBENCH_ENV_BIN}:$PATH && "
 DEFAULT_EXCLUDED_PATH_REGEXES = (r"(^|/)auth/", r"(^|/)billing/", r"(^|/)infra/")
 
 REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -441,16 +443,29 @@ def _verifier_command(row: Mapping[str, Any], source: Source, framework: Framewo
         )
         rebuild = " && ".join(cmd for cmd in _string_list(row.get("rebuild_cmds")) if cmd.strip())
         return f"{rebuild} && {command}" if rebuild else command
-    return _with_pytest_junit(_rebench_test_command(row))
+    return f"{_rebench_env_prefix(row)}{_with_pytest_junit(_rebench_test_command(row))}"
 
 
-def _rebench_test_command(row: Mapping[str, Any]) -> str:
+def _install_config(row: Mapping[str, Any]) -> Any:
     install_config = row.get("install_config")
     if isinstance(install_config, str):
         try:
-            install_config = json.loads(install_config)
+            return json.loads(install_config)
         except ValueError:
-            install_config = None
+            return None
+    return install_config
+
+
+def _rebench_env_prefix(row: Mapping[str, Any]) -> str:
+    """The image's conda env holds pytest unless the row opts out of it."""
+    install_config = _install_config(row)
+    if isinstance(install_config, Mapping) and install_config.get("no_use_env") is True:
+        return ""
+    return REBENCH_ENV_PREFIX
+
+
+def _rebench_test_command(row: Mapping[str, Any]) -> str:
+    install_config = _install_config(row)
     if isinstance(install_config, Mapping):
         command = str(install_config.get("test_cmd") or "").strip()
         if command:
@@ -473,7 +488,7 @@ def _with_vitest_junit(command: str) -> str:
 
 def _visible_command(row: Mapping[str, Any], source: Source, framework: Framework) -> str:
     if source == "rebench":
-        return _rebench_test_command(row)
+        return f"{_rebench_env_prefix(row)}{_rebench_test_command(row)}"
     commands = _string_list(row.get("test_cmds"))
     if commands:
         return " && ".join(commands)

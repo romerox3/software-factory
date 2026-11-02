@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from factory.tasks.import_hf import REBENCH_ENV_PREFIX
 from factory.tasks.to_harbor import to_harbor
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -72,12 +73,34 @@ def test_task_toml_and_dockerfile(tmp_path: Path) -> None:
 
     dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
     assert dockerfile.splitlines()[0] == f"FROM {TASK['image']}"
+    assert not any(line.startswith("ENV PATH=") for line in dockerfile.splitlines())
 
     test_script = generated / "tests" / "test.sh"
     contents = test_script.read_text(encoding="utf-8")
     assert contents.startswith("#!/usr/bin/env bash\nset -euo pipefail\n")
     assert TASK["visible_tests"]["command"] in contents
     assert os.access(test_script, os.X_OK)
+
+
+def test_rebench_env_is_added_to_the_agent_image(tmp_path: Path) -> None:
+    task_dir = copy_visible_task(tmp_path)
+    write_task_config(
+        task_dir,
+        visible_tests={
+            "command": f"{REBENCH_ENV_PREFIX}python -m pytest -q tests/visible",
+            "ids": [],
+        },
+    )
+
+    generated = to_harbor(task_dir, tmp_path / "out")
+
+    dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
+    assert dockerfile.splitlines()[-2:] == [
+        "ENV PATH=/opt/conda/envs/testbed/bin:$PATH",
+        "WORKDIR /workspace",
+    ]
+    test_script = (generated / "tests" / "test.sh").read_text(encoding="utf-8")
+    assert f"{REBENCH_ENV_PREFIX}python -m pytest -q tests/visible" in test_script
 
 
 def test_existing_task_directory_is_rejected(tmp_path: Path) -> None:

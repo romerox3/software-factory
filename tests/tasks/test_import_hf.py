@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from factory.tasks.import_hf import (
+    REBENCH_ENV_PREFIX,
     download_split,
     load_rows,
     load_split,
@@ -93,6 +94,8 @@ def test_multilang_framework_comes_from_the_test_command_and_jest_is_rejected() 
     assert candidate.verifier_command == (
         "npm ci && npx vitest run --reporter=junit --outputFile=/logs/verifier/junit.xml"
     )
+    assert not candidate.visible_command.startswith("export PATH")
+    assert not candidate.verifier_command.startswith("export PATH")
 
 
 def test_multilang_vitest_command_replaces_other_reporters() -> None:
@@ -130,9 +133,57 @@ def test_rebench_uses_the_rows_own_test_command() -> None:
     )
 
     assert selected[0].verifier_command == (
+        f"{REBENCH_ENV_PREFIX}pytest -q tests/test_widgets.py --junitxml=/logs/verifier/junit.xml"
+    )
+    assert selected[0].visible_command == f"{REBENCH_ENV_PREFIX}pytest -q tests/test_widgets.py"
+
+
+def test_rebench_uses_the_conda_env_when_the_row_allows_it() -> None:
+    row = dict(load_rows(REBENCH)[0])
+    row["install_config"] = {
+        "test_cmd": "pytest -q tests/test_widgets.py",
+        "no_use_env": False,
+    }
+
+    selected, _ = select(
+        [row],
+        source="rebench",
+        cutoff=CUTOFF,
+        digests=digests_for([row]),
+        excluded_path_regexes=EXCLUDED_PATH_REGEXES,
+        seed=0,
+        limit=1,
+    )
+
+    candidate = selected[0]
+    assert candidate.visible_command == f"{REBENCH_ENV_PREFIX}pytest -q tests/test_widgets.py"
+    assert candidate.verifier_command == (
+        f"{REBENCH_ENV_PREFIX}pytest -q tests/test_widgets.py --junitxml=/logs/verifier/junit.xml"
+    )
+
+
+def test_rebench_skips_the_conda_env_when_the_row_opts_out() -> None:
+    row = dict(load_rows(REBENCH)[0])
+    row["install_config"] = {
+        "test_cmd": "pytest -q tests/test_widgets.py",
+        "no_use_env": True,
+    }
+
+    selected, _ = select(
+        [row],
+        source="rebench",
+        cutoff=CUTOFF,
+        digests=digests_for([row]),
+        excluded_path_regexes=EXCLUDED_PATH_REGEXES,
+        seed=0,
+        limit=1,
+    )
+
+    candidate = selected[0]
+    assert candidate.visible_command == "pytest -q tests/test_widgets.py"
+    assert candidate.verifier_command == (
         "pytest -q tests/test_widgets.py --junitxml=/logs/verifier/junit.xml"
     )
-    assert selected[0].visible_command == "pytest -q tests/test_widgets.py"
 
 
 def test_sampling_is_stable_for_one_seed_and_can_change_with_another() -> None:
@@ -202,7 +253,10 @@ def test_write_task_keeps_the_hidden_material_out_of_the_visible_tree(
         "commit": candidate.base_commit,
         "workdir": "/workspace",
     }
-    assert task["visible_tests"] == {"command": "python -m pytest -q", "ids": []}
+    assert task["visible_tests"] == {
+        "command": f"{REBENCH_ENV_PREFIX}python -m pytest -q",
+        "ids": [],
+    }
     assert task["source"] == {
         "dataset": REBENCH_DATASET,
         "revision": REVISION,
