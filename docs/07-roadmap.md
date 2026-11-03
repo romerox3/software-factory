@@ -81,6 +81,13 @@
 
 Los identificadores `F0-NN` se mantienen. Estado a 2026-11-02: F0-01 a F0-17 y F0-21 hechas; F0-18 en curso (programa de la matriz); F0-19 y F0-20 pendientes. El conjunto v1 (`tasks/public-v1.manifest.json`) tiene 35 tareas Python de SWE-rebench (enero a marzo de 2026): de 39 válidas en la revalidación, se quitan 4 cuyo parche gold no acepta el verificador (una sin informe JUnit y tres falsos `cheat_suspected` del flujo de resultados, pendientes de investigar). TS queda fuera de v1: tras el tope de un día, 3 tareas pasaban la revalidación pero ninguna funciona en el sandbox del verificador (corepack sin red, copia del almacén de pnpm); pasa a la fase D.
 
+**Auditoría ciega de alineación spec ↔ test (decisión del propietario del 2026-11-03).** En la primera tanda de la matriz apareció una tarea cuyo test oculto exige un arreglo que la spec no pide: la spec describe un error y el PR original arregló además otro [Cierto, revisión del orquestador]. Una tarea así penaliza por igual a todos los brazos: no sesga la comparación pareada, pero le quita potencia y rebaja la tasa absoluta. Las 35 tareas se auditan con un criterio adaptado del de SWE-bench Verified ([OpenAI](https://openai.com/index/introducing-swe-bench-verified/)), fijado antes de ver los resultados agregados:
+
+- **P1, especificación** (0–3): 0, bien especificada; 1, con huecos que una interpretación sensata rellena; 2, vaga, con varias soluciones razonables distintas; 3, sin más información no se sabe qué hacer.
+- **P2, tests F2P** (0–3): 0, aceptan cualquier solución razonable de lo que pide la spec; 1, aceptan casi todas; 2, rechazan soluciones razonables porque exigen nombres, firmas o formatos que no se deducen de la spec ni del repo; 3, comprueban algo que la spec no pide.
+- La tarea sale del análisis principal si P1 ≥ 2 o P2 ≥ 2. El informe de la fase A da también las cifras con las 35, como análisis de sensibilidad.
+- La audita un subagente que no ve los resultados de los brazos, solo la spec visible, el repo en el commit base, el parche de tests, el gold y la lista F2P. El orquestador no puede hacerlo a ciegas porque ya vio la primera tanda. Las tareas que el auditor marque como dudosas se le preguntan al propietario. Se descarta la tarea; la spec no se reescribe.
+
 **Convenciones de despacho** (ver [CLAUDE.md](../CLAUDE.md)):
 - **Peón**: OpenCode con GLM o DeepSeek a través del gateway, en un worktree aislado. Recibe la spec tal cual. Nunca recibe datos del almacén privado: se le dan fixtures públicos.
 - **Sonnet**: piezas delicadas (verificador antitrampas, contrato de ejecutor, aislamiento). Como mucho 3 al día.
