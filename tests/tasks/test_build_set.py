@@ -31,11 +31,13 @@ class FakeBuild:
         *,
         digest_error: bool = False,
         outcome: dict[str, Any] | None = None,
+        rows: list[dict[str, Any]] | None = None,
     ) -> None:
         self.download_dir = tmp_path / "download"
         self.download_dir.mkdir(parents=True)
-        row = dict(load_rows(REBENCH)[0])
-        (self.download_dir / "2026_03.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+        rows = rows or [dict(load_rows(REBENCH)[0])]
+        lines = "".join(json.dumps(row) + "\n" for row in rows)
+        (self.download_dir / "2026_03.jsonl").write_text(lines, encoding="utf-8")
         self.digest_error = digest_error
         self.outcome = outcome or {"valid": True, "reason": "ok", "f2p": [], "p2p": []}
         self.calls: list[tuple[Any, ...]] = []
@@ -227,6 +229,33 @@ def test_the_cutoff_drops_older_rows(tmp_path: Path) -> None:
     build_set.main(arguments(tmp_path, cutoff="2027-01-01"), deps=fake.deps())
 
     assert [call[0] for call in fake.calls] == ["download", "digest"]
+
+
+def test_only_keeps_the_listed_rows_and_reports_unknown_ids(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    kept = {"acme__widgets-1001", "acme__widgets-1004"}
+    rows = [
+        row for row in load_rows(REBENCH) if row["instance_id"] in kept | {"acme__widgets-1002"}
+    ]
+    fake = FakeBuild(tmp_path, rows=rows)
+    listing = tmp_path / "audit-ids.txt"
+    listing.write_text(
+        "# chosen by the alignment audit\n\nacme__widgets-1001\nacme__widgets-1004\n"
+        "acme__widgets-9999\n",
+        encoding="utf-8",
+    )
+
+    assert build_set.main(arguments(tmp_path, "--only", str(listing)), deps=fake.deps()) == 0
+
+    assert capsys.readouterr().err == "not in split 2026_03: acme__widgets-9999\n"
+    digested = [call[1] for call in fake.calls if call[0] == "digest"]
+    assert digested == ["ghcr.io/acme/widgets-1001:latest", "ghcr.io/acme/widgets-1004:latest"]
+    assert [call[1].split("@")[0] for call in fake.calls if call[0] == "pull"] == [
+        image.removesuffix(":latest") for image in digested
+    ]
+    manifest = json.loads((tmp_path / "tasks" / "public-v1.manifest.json").read_text())
+    assert [entry["instance_id"] for entry in manifest["tasks"]] == sorted(kept)
 
 
 def test_cutoff_is_parsed_as_utc_midnight() -> None:

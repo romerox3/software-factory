@@ -60,6 +60,8 @@ def main(argv: Sequence[str] | None = None, *, deps: BuildDeps | None = None) ->
 
     downloaded = deps.download(args.dataset, args.revision, args.split, args.work / "download")
     rows = load_split(downloaded, args.split)
+    if args.only is not None:
+        rows = _restrict(rows, args.only, args.split)
     digests = _resolve_digests(rows, deps.resolve_digest)
     candidates, rejections = select(
         rows,
@@ -122,6 +124,21 @@ def _build_one(candidate: Candidate, args: argparse.Namespace, deps: BuildDeps) 
             deps.remove(candidate.image)
 
 
+def _restrict(rows: list[dict[str, Any]], only: Path, split: str) -> list[dict[str, Any]]:
+    """Keep the rows listed in ``only``; ids missing from the split are only reported."""
+    ids: list[str] = [
+        text
+        for line in Path(only).read_text(encoding="utf-8").splitlines()
+        if (text := line.strip()) and not text.startswith("#")
+    ]
+    wanted = set(ids)
+    present = {str(row["instance_id"]) for row in rows}
+    for instance_id in dict.fromkeys(ids):
+        if instance_id not in present:
+            print(f"not in split {split}: {instance_id}", file=sys.stderr)
+    return [row for row in rows if str(row["instance_id"]) in wanted]
+
+
 def _resolve_digests(rows: list[dict[str, Any]], resolve: Callable[[str], str]) -> dict[str, str]:
     """Pin every image of the split; an unresolvable one becomes a ``no_digest`` rejection."""
     images = sorted({str(row["docker_image"]) for row in rows if row.get("docker_image")})
@@ -176,6 +193,7 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--keep-images", action="store_true")
+    parser.add_argument("--only", type=Path)
     return parser.parse_args(argv)
 
 
