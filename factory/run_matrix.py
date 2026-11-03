@@ -96,6 +96,10 @@ STREAM_FILES = {
 }
 MINI_TRAJECTORY = "mini-swe-agent.trajectory.json"
 
+# Harbor exception types that mean the provider refused the run: an exhausted
+# quota (``[1308] Usage limit reached``) is infrastructure, not an arm result.
+RATE_LIMIT_EXCEPTIONS = frozenset({"ApiRateLimitError"})
+
 
 class KeyClient(Protocol):
     """The slice of ``FactoryKeysClient`` the matrix uses."""
@@ -127,6 +131,10 @@ def _key_hash(key: str) -> str:
 
 class KeyPoolExhausted(RuntimeError):
     """The pre-minted pool has no unused key left."""
+
+
+class ProviderRateLimit(RuntimeError):
+    """The provider refused a run because a quota ran out; stop the matrix."""
 
 
 class KeyPool:
@@ -854,8 +862,10 @@ def _execute_attempt(
         host_diff = _host_diff(patch)
 
         setup_failure = _setup_failure(result)
-        if setup_failure is not None:
-            decision = ExitDecision(ERROR, _redact(setup_failure, key))
+        rate_limit = _rate_limit_failure(result)
+        infra_failure = rate_limit if rate_limit is not None else setup_failure
+        if infra_failure is not None:
+            decision = ExitDecision(ERROR, _redact(infra_failure, key))
         else:
             decision = map_exit(
                 executor=run.arm.executor,
@@ -887,7 +897,7 @@ def _execute_attempt(
         run_path = args.out / "runs" / f"{run.run_id}.json"
         write_run_document(run_document, run_path)
 
-        if trial is None or result is None or setup_failure is not None:
+        if trial is None or result is None or infra_failure is not None:
             _write_infra_verdict(
                 run,
                 args,
@@ -895,6 +905,8 @@ def _execute_attempt(
                 diff_sha=host_diff.sha256,
                 duration_s=_wall_seconds(started, ended),
             )
+            if rate_limit is not None:
+                raise ProviderRateLimit(decision.detail)
             return
 
         _verify(attempt, args, deps, run_path, diff_path, host_diff.sha256, started, ended)
@@ -1150,6 +1162,32 @@ def _patch_stats(patch: bytes) -> tuple[int, int, int]:
     return files, added, removed
 
 
+def _exception_reason(result: Mapping[str, Any] | None) -> tuple[str, str] | None:
+    """``(exception_type, message)`` when Harbor recorded an exception."""
+    if not isinstance(result, Mapping):
+        return None
+    info = result.get("exception_info")
+    if not isinstance(info, Mapping):
+        return None
+    exception_type = info.get("exception_type")
+    message = info.get("exception_message")
+    kind = exception_type if isinstance(exception_type, str) else "exception"
+    text = message if isinstance(message, str) else ""
+    return kind, text
+
+
+def _rate_limit_failure(result: Mapping[str, Any] | None) -> str | None:
+    """``exception_type: message`` when the provider rate-limited the run.
+
+    Unlike a setup failure this applies whether or not the agent had started:
+    the arm got no chance to produce a result.
+    """
+    reason = _exception_reason(result)
+    if reason is None or reason[0] not in RATE_LIMIT_EXCEPTIONS:
+        return None
+    return f"{reason[0]}: {reason[1][:300]}"
+
+
 def _setup_failure(result: Mapping[str, Any] | None) -> str | None:
     """``exception_type: message`` when Harbor failed before the agent started.
 
@@ -1157,19 +1195,13 @@ def _setup_failure(result: Mapping[str, Any] | None) -> str | None:
     environment or agent setup; that is infrastructure, not an arm result. An
     exception after the agent ran keeps the normal ``map_exit`` mapping.
     """
-    if not isinstance(result, Mapping):
-        return None
-    info = result.get("exception_info")
-    if not isinstance(info, Mapping):
+    reason = _exception_reason(result)
+    if not isinstance(result, Mapping) or reason is None:
         return None
     execution = result.get("agent_execution")
     if isinstance(execution, Mapping) and execution.get("started_at") is not None:
         return None
-    exception_type = info.get("exception_type")
-    message = info.get("exception_message")
-    kind = exception_type if isinstance(exception_type, str) else "exception"
-    text = message if isinstance(message, str) else ""
-    return f"{kind}: {text[:300]}"
+    return f"{reason[0]}: {reason[1][:300]}"
 
 
 def _agent_reported_usd(result: Mapping[str, Any] | None) -> float | None:
@@ -1392,6 +1424,9 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
                     except KeyPoolExhausted as exc:
                         stop.set()
                         print(f"key pool exhausted: {_redact(str(exc))}", file=sys.stderr)
+                    except ProviderRateLimit as exc:
+                        stop.set()
+                        print(f"provider rate limit: {exc}", file=sys.stderr)
                     except Exception as exc:  # noqa: BLE001 - report and keep accounting the rest
                         failures += 1
                         print(f"run failed to record: {_redact(str(exc))}", file=sys.stderr)
@@ -1488,7 +1523,7 @@ def _run_one(
                 holder=holder,
             )
             _execute_attempt(attempt, args, deps, client)
-        except KeyPoolExhausted:
+        except (KeyPoolExhausted, ProviderRateLimit):
             raise
         except Exception as exc:  # noqa: BLE001 - every planned run gets a verdict
             reason = _redact(f"{type(exc).__name__}: {exc}", holder.get("key"))

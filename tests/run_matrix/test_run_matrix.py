@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from factory.adapters.output import validate_run_document
 from factory.metrics.load import load_dataset
 from factory.run_matrix import (
     REPO_ROOT,
@@ -497,6 +498,77 @@ def test_setup_exception_is_error_infra_and_retried(tmp_path: Path) -> None:
     retried = json.loads((out / "verdicts" / "a1-demo-task-r1-a2.json").read_text())
     assert retried["attempt"] == 2
     assert retried["verdict"] == "error_infra"
+
+
+def test_provider_rate_limit_after_start_is_error_infra(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    harbor = FakeHarbor(trial_source=FIXTURES / "harbor_rate_limit")
+    verifier = FakeVerifier()
+
+    code = main(
+        _run_args(store, arms, out, tmp_path / "work"),
+        deps=_deps(harbor=harbor, verifier=verifier),
+    )
+
+    run_id = "a1-demo-task-r1-a1"
+    assert code == 1
+    assert verifier.calls == []
+    run_document = json.loads((out / "runs" / f"{run_id}.json").read_text())
+    validate_run_document(run_document)
+    assert run_document["exit"] == "error"
+    fixture = json.loads((FIXTURES / "harbor_rate_limit" / "result.json").read_text())
+    message = fixture["exception_info"]["exception_message"]
+    expected = f"ApiRateLimitError: {message[:300]}"
+    assert run_document["exit_detail"] == expected
+    verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
+    assert verdict["verdict"] == "error_infra"
+    assert verdict["reason"] == expected
+    assert f"provider rate limit: {expected}" in capsys.readouterr().err
+
+
+def test_provider_rate_limit_stops_the_matrix(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=3)], max_parallel=1)
+    out = tmp_path / "out"
+    harbor = FakeHarbor(trial_source=FIXTURES / "harbor_rate_limit")
+
+    code = main(
+        _run_args(store, arms, out, tmp_path / "work"),
+        deps=_deps(harbor=harbor),
+    )
+
+    assert code == 1
+    assert harbor.calls == 1
+    captured = capsys.readouterr()
+    assert "provider rate limit: ApiRateLimitError: [1308] Usage limit reached" in captured.err
+    assert "stopped: 2 runs not started" in captured.err
+    assert len(list((out / "verdicts").glob("*.json"))) == 1
+
+
+def test_provider_rate_limit_lets_in_flight_runs_finish(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=3)], max_parallel=2)
+    out = tmp_path / "out"
+    harbor = FakeHarbor(trial_source=FIXTURES / "harbor_rate_limit", delay=0.1)
+
+    code = main(
+        _run_args(store, arms, out, tmp_path / "work"),
+        deps=_deps(harbor=harbor),
+    )
+
+    assert code == 1
+    assert harbor.calls == 2
+    verdicts = [json.loads(path.read_text()) for path in (out / "verdicts").glob("*.json")]
+    assert [verdict["verdict"] for verdict in verdicts] == ["error_infra", "error_infra"]
+    assert "stopped: 1 runs not started" in capsys.readouterr().err
 
 
 def test_agent_timeout_after_execution_keeps_map_exit(tmp_path: Path) -> None:
