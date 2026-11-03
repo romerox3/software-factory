@@ -10,6 +10,14 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "a2aproject__a2a-python-682_interface",
+      "task_id": "a2aproject__a2a-python-682_interface",
+      "image": "swerebench/sweb.eval.x86_64.a2aproject_1776_a2a-python-682_interface@sha256:babf1e0b35b4f2245b75b50bdd406ea427a8904ca64dc63ee619228a495f24c7",
+      "digest": "sha256:babf1e0b35b4f2245b75b50bdd406ea427a8904ca64dc63ee619228a495f24c7"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
       "instance_id": "apache__iceberg-python-3295",
       "task_id": "apache__iceberg-python-3295",
       "image": "swerebench/sweb.eval.x86_64.apache_1776_iceberg-python-3295@sha256:10595208bda942416f6673a2629c9fb66bd5226818bbe62ce1ef99a3bef8e6d1",
@@ -18,42 +26,58 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "avaiga__taipy-2797",
-      "task_id": "avaiga__taipy-2797",
-      "image": "swerebench/sweb.eval.x86_64.avaiga_1776_taipy-2797@sha256:c0a53b21b1a867b2571a6ea5796cb1261dcb4eefff915d1ff6378408410be8e7",
-      "digest": "sha256:c0a53b21b1a867b2571a6ea5796cb1261dcb4eefff915d1ff6378408410be8e7"
+      "instance_id": "aws__bedrock-agentcore-sdk-python-279_interface",
+      "task_id": "aws__bedrock-agentcore-sdk-python-279_interface",
+      "image": "swerebench/sweb.eval.x86_64.aws_1776_bedrock-agentcore-sdk-python-279_interface@sha256:4dfe004346a64cc8fdc1dfecd0d839923ab1e50f5ffab969fc0def85da001789",
+      "digest": "sha256:4dfe004346a64cc8fdc1dfecd0d839923ab1e50f5ffab969fc0def85da001789"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "aws-cloudformation__cfn-python-lint-4368",
-      "task_id": "aws-cloudformation__cfn-python-lint-4368",
-      "image": "swerebench/sweb.eval.x86_64.aws-cloudformation_1776_cfn-python-lint-4368@sha256:32b8116c42d80d1acf31e83d3dce7547c13a5ba78bfe0b39037acb6331137c31",
-      "digest": "sha256:32b8116c42d80d1acf31e83d3dce7547c13a5ba78bfe0b39037acb6331137c31"
+      "instance_id": "beever-ai__beever-atlas-102",
+      "task_id": "beever-ai__beever-atlas-102",
+      "image": "swerebench/sweb.eval.x86_64.beever-ai_1776_beever-atlas-102@sha256:e4eea111ce131cc84d1cb865f550fc6c5025ebea496e030977be1c93ea5cf0be",
+      "digest": "sha256:e4eea111ce131cc84d1cb865f550fc6c5025ebea496e030977be1c93ea5cf0be"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "cs-si__eodag-2176",
-      "task_id": "cs-si__eodag-2176",
-      "image": "swerebench/sweb.eval.x86_64.cs-si_1776_eodag-2176@sha256:abdf3c8dd48ac05e351489c400a6b9625beeb2d2eda641b84056151d88cb0dfb",
-      "digest": "sha256:abdf3c8dd48ac05e351489c400a6b9625beeb2d2eda641b84056151d88cb0dfb"
+      "instance_id": "con__nwb2bids-347_interface",
+      "task_id": "con__nwb2bids-347_interface",
+      "image": "swerebench/sweb.eval.x86_64.con_1776_nwb2bids-347_interface@sha256:69c4cbb9a5bcae8b2ce1c8c0301e0dffa3e636d94211bdaf5858d2d28c2dca4e",
+      "digest": "sha256:69c4cbb9a5bcae8b2ce1c8c0301e0dffa3e636d94211bdaf5858d2d28c2dca4e"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "gammapy__gammapy-6409",
-      "task_id": "gammapy__gammapy-6409",
-      "image": "swerebench/sweb.eval.x86_64.gammapy_1776_gammapy-6409@sha256:c50b4d96568a3a8de4e3d03a80b87fb6f9a70b8edcd5191aba0099f14cf68043",
-      "digest": "sha256:c50b4d96568a3a8de4e3d03a80b87fb6f9a70b8edcd5191aba0099f14cf68043"
+      "instance_id": "conan-io__conan-19735_interface",
+      "task_id": "conan-io__conan-19735_interface",
+      "image": "swerebench/sweb.eval.x86_64.conan-io_1776_conan-19735_interface@sha256:564734fbebe544567e2e47bac7362ae68a749ffdaa7401dd273903d3552277fa",
+      "digest": "sha256:564734fbebe544567e2e47bac7362ae68a749ffdaa7401dd273903d3552277fa"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "genericmappingtools__pygmt-4342",
-      "task_id": "genericmappingtools__pygmt-4342",
-      "image": "swerebench/sweb.eval.x86_64.genericmappingtools_1776_pygmt-4342@sha256:b33d962e33e49a437f15e667758b7ef11081990b9c1cc94753bf9c2f1ed61b8c",
-      "digest": "sha256:b33d962e33e49a437f15e667758b7ef11081990b9c1cc94753bf9c2f1ed61b8c"
+      "instance_id": "cpp-linter__cpp-linter-hooks-206_interface",
+      "task_id": "cpp-linter__cpp-linter-hooks-206_interface",
+      "image": "swerebench/sweb.eval.x86_64.cpp-linter_1776_cpp-linter-hooks-206_interface@sha256:98ca02972a37398d2bb690785f79a94a07396be022f547d640b27d950d92a179",
+      "digest": "sha256:98ca02972a37398d2bb690785f79a94a07396be022f547d640b27d950d92a179"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "delgan__loguru-1451",
+      "task_id": "delgan__loguru-1451",
+      "image": "swerebench/sweb.eval.x86_64.delgan_1776_loguru-1451@sha256:181bd51aa34ebe84d749819dfbe9a2d3d215ff8f6406d897d790f876bc5f36db",
+      "digest": "sha256:181bd51aa34ebe84d749819dfbe9a2d3d215ff8f6406d897d790f876bc5f36db"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "deltares__hydrolib-core-1049_interface",
+      "task_id": "deltares__hydrolib-core-1049_interface",
+      "image": "swerebench/sweb.eval.x86_64.deltares_1776_hydrolib-core-1049_interface@sha256:04d3d1ba2f09b9ef8a0d200fc93a18ccdf26e3722ed7853d751720cdb3fc2f07",
+      "digest": "sha256:04d3d1ba2f09b9ef8a0d200fc93a18ccdf26e3722ed7853d751720cdb3fc2f07"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
@@ -70,6 +94,14 @@
       "task_id": "huggingface__huggingface_hub-4056",
       "image": "swerebench/sweb.eval.x86_64.huggingface_1776_huggingface_hub-4056@sha256:cbfae263dff792cc7c763057905869c548bf37733352ff999b3d7d4278c87677",
       "digest": "sha256:cbfae263dff792cc7c763057905869c548bf37733352ff999b3d7d4278c87677"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "idaholab__montepy-933_interface",
+      "task_id": "idaholab__montepy-933_interface",
+      "image": "swerebench/sweb.eval.x86_64.idaholab_1776_montepy-933_interface@sha256:d79f83f33b0f25749596dd0038adecb80e9b443300200890dca0f6d23488567c",
+      "digest": "sha256:d79f83f33b0f25749596dd0038adecb80e9b443300200890dca0f6d23488567c"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
@@ -98,50 +130,34 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "koxudaxi__datamodel-code-generator-2996",
-      "task_id": "koxudaxi__datamodel-code-generator-2996",
-      "image": "swerebench/sweb.eval.x86_64.koxudaxi_1776_datamodel-code-generator-2996@sha256:aece8b5b9fedd6909c957226c9df1f85951f6d0370fe77281f71af8b8bf60626",
-      "digest": "sha256:aece8b5b9fedd6909c957226c9df1f85951f6d0370fe77281f71af8b8bf60626"
+      "instance_id": "litestar-org__advanced-alchemy-673_interface",
+      "task_id": "litestar-org__advanced-alchemy-673_interface",
+      "image": "swerebench/sweb.eval.x86_64.litestar-org_1776_advanced-alchemy-673_interface@sha256:371e3bba6d56c25218d258726c4855d025f1aad3e78bf13bf58fca5f2cc8402e",
+      "digest": "sha256:371e3bba6d56c25218d258726c4855d025f1aad3e78bf13bf58fca5f2cc8402e"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "koxudaxi__datamodel-code-generator-2998",
-      "task_id": "koxudaxi__datamodel-code-generator-2998",
-      "image": "swerebench/sweb.eval.x86_64.koxudaxi_1776_datamodel-code-generator-2998@sha256:fa009aa369191837f59a3b72fbbf77cc172379e6df0f8f4df7fdd55070254701",
-      "digest": "sha256:fa009aa369191837f59a3b72fbbf77cc172379e6df0f8f4df7fdd55070254701"
+      "instance_id": "macbre__sql-metadata-625_interface",
+      "task_id": "macbre__sql-metadata-625_interface",
+      "image": "swerebench/sweb.eval.x86_64.macbre_1776_sql-metadata-625_interface@sha256:5cece931a26478cd7247ba8ccbcd6c2865aa0437aeed4ac84f23744a9f53ef85",
+      "digest": "sha256:5cece931a26478cd7247ba8ccbcd6c2865aa0437aeed4ac84f23744a9f53ef85"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "koxudaxi__datamodel-code-generator-3046",
-      "task_id": "koxudaxi__datamodel-code-generator-3046",
-      "image": "swerebench/sweb.eval.x86_64.koxudaxi_1776_datamodel-code-generator-3046@sha256:77fe48867b411d845cbfe4b02ab159f3bb81710c1f0047a31b37a7b3548e575a",
-      "digest": "sha256:77fe48867b411d845cbfe4b02ab159f3bb81710c1f0047a31b37a7b3548e575a"
+      "instance_id": "marimo-team__marimo-8387_interface",
+      "task_id": "marimo-team__marimo-8387_interface",
+      "image": "swerebench/sweb.eval.x86_64.marimo-team_1776_marimo-8387_interface@sha256:5d43643e3cb0e9b3e4fd635e505253c514a9e26d5350772cacc91f0a784af47f",
+      "digest": "sha256:5d43643e3cb0e9b3e4fd635e505253c514a9e26d5350772cacc91f0a784af47f"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "marimo-team__marimo-8401",
-      "task_id": "marimo-team__marimo-8401",
-      "image": "swerebench/sweb.eval.x86_64.marimo-team_1776_marimo-8401@sha256:a67454580e3e9faba01292cd62833002e3ee08ea0a6e121e72372e433a80d7cd",
-      "digest": "sha256:a67454580e3e9faba01292cd62833002e3ee08ea0a6e121e72372e433a80d7cd"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "meltano__meltano-9929",
-      "task_id": "meltano__meltano-9929",
-      "image": "swerebench/sweb.eval.x86_64.meltano_1776_meltano-9929@sha256:3ecc39249a32afc5644386f75b81852384aa9dfaf9b306a18195ebb0b8bc17bb",
-      "digest": "sha256:3ecc39249a32afc5644386f75b81852384aa9dfaf9b306a18195ebb0b8bc17bb"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "narwhals-dev__narwhals-3478",
-      "task_id": "narwhals-dev__narwhals-3478",
-      "image": "swerebench/sweb.eval.x86_64.narwhals-dev_1776_narwhals-3478@sha256:33f5e8a66ea9235065c44c2c2fe5fff3fa1f35c375d028832c6f6262ea321764",
-      "digest": "sha256:33f5e8a66ea9235065c44c2c2fe5fff3fa1f35c375d028832c6f6262ea321764"
+      "instance_id": "marshmallow-code__marshmallow-2925_interface",
+      "task_id": "marshmallow-code__marshmallow-2925_interface",
+      "image": "swerebench/sweb.eval.x86_64.marshmallow-code_1776_marshmallow-2925_interface@sha256:967a07ee58cd51e937b4f6575c89d1c37bdc24ba18003914a50bc5d1e7f50589",
+      "digest": "sha256:967a07ee58cd51e937b4f6575c89d1c37bdc24ba18003914a50bc5d1e7f50589"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
@@ -154,18 +170,10 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "newton-physics__newton-1582",
-      "task_id": "newton-physics__newton-1582",
-      "image": "swerebench/sweb.eval.x86_64.newton-physics_1776_newton-1582@sha256:94fe09e46954bc6bf508082234b141a2203a395a699c2bc1d1bd7d1859210374",
-      "digest": "sha256:94fe09e46954bc6bf508082234b141a2203a395a699c2bc1d1bd7d1859210374"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "nolar__kopf-1225",
-      "task_id": "nolar__kopf-1225",
-      "image": "swerebench/sweb.eval.x86_64.nolar_1776_kopf-1225@sha256:c9344b122a31dcb189ab83598c2e3998441caecc716858bbb4cd221ec3ae4724",
-      "digest": "sha256:c9344b122a31dcb189ab83598c2e3998441caecc716858bbb4cd221ec3ae4724"
+      "instance_id": "nilearn__nilearn-6031_interface",
+      "task_id": "nilearn__nilearn-6031_interface",
+      "image": "swerebench/sweb.eval.x86_64.nilearn_1776_nilearn-6031_interface@sha256:5bddaf51a6ad34b7632e2b10553bf3807ba84e2b3f22fa1ce62d1f3471296eeb",
+      "digest": "sha256:5bddaf51a6ad34b7632e2b10553bf3807ba84e2b3f22fa1ce62d1f3471296eeb"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
@@ -174,22 +182,6 @@
       "task_id": "open-telemetry__opentelemetry-python-4891",
       "image": "swerebench/sweb.eval.x86_64.open-telemetry_1776_opentelemetry-python-4891@sha256:ff4a6c54752af28ca6425add0c91418bc470669b749a5106c3b34f3bf693a59b",
       "digest": "sha256:ff4a6c54752af28ca6425add0c91418bc470669b749a5106c3b34f3bf693a59b"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "opsmill__infrahub-8407",
-      "task_id": "opsmill__infrahub-8407",
-      "image": "swerebench/sweb.eval.x86_64.opsmill_1776_infrahub-8407@sha256:25e140d3fe4a01654ff3421263be38c207335a39c016567cd6e5ca8ee9752a6d",
-      "digest": "sha256:25e140d3fe4a01654ff3421263be38c207335a39c016567cd6e5ca8ee9752a6d"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "opsmill__infrahub-8423",
-      "task_id": "opsmill__infrahub-8423",
-      "image": "swerebench/sweb.eval.x86_64.opsmill_1776_infrahub-8423@sha256:ae2a5e2f7ca8227c2678ea0beff9863b032dc9fe5d68e5795b13fa4064fc3de3",
-      "digest": "sha256:ae2a5e2f7ca8227c2678ea0beff9863b032dc9fe5d68e5795b13fa4064fc3de3"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
@@ -210,26 +202,10 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "psd-tools__psd-tools-593",
-      "task_id": "psd-tools__psd-tools-593",
-      "image": "swerebench/sweb.eval.x86_64.psd-tools_1776_psd-tools-593@sha256:eb1277e5cc12e3f6986b35ac1d4e454f4c7679b2bd078d4598db38b2f9fc6838",
-      "digest": "sha256:eb1277e5cc12e3f6986b35ac1d4e454f4c7679b2bd078d4598db38b2f9fc6838"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
       "instance_id": "pydap__pydap-624",
       "task_id": "pydap__pydap-624",
       "image": "swerebench/sweb.eval.x86_64.pydap_1776_pydap-624@sha256:2754bdaec1600f165fde35d6c7bf231f2fb0c3b8bf940ceffc1dca95a9f5f32b",
       "digest": "sha256:2754bdaec1600f165fde35d6c7bf231f2fb0c3b8bf940ceffc1dca95a9f5f32b"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "pyinfra-dev__pyinfra-1665",
-      "task_id": "pyinfra-dev__pyinfra-1665",
-      "image": "swerebench/sweb.eval.x86_64.pyinfra-dev_1776_pyinfra-1665@sha256:138a496547f392c77a1d472fd259e3c3fff6dd20bf5cba084335888857f395a3",
-      "digest": "sha256:138a496547f392c77a1d472fd259e3c3fff6dd20bf5cba084335888857f395a3"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
@@ -250,14 +226,6 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "python-scim__scim2-models-120",
-      "task_id": "python-scim__scim2-models-120",
-      "image": "swerebench/sweb.eval.x86_64.python-scim_1776_scim2-models-120@sha256:a62fc935f7fd3fcde08bcf2bce08f29c9f4a25d9b222f7a2c0129e603b509b37",
-      "digest": "sha256:a62fc935f7fd3fcde08bcf2bce08f29c9f4a25d9b222f7a2c0129e603b509b37"
-    },
-    {
-      "dataset": "nebius/SWE-rebench-leaderboard",
-      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
       "instance_id": "python-scim__scim2-models-126",
       "task_id": "python-scim__scim2-models-126",
       "image": "swerebench/sweb.eval.x86_64.python-scim_1776_scim2-models-126@sha256:2919b6cc832060ae0a9ef01ffc42cd996695f79ca939d9e706cc2b2cc9bc49df",
@@ -266,10 +234,18 @@
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
       "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
-      "instance_id": "raullenchai__rapid-mlx-228",
-      "task_id": "raullenchai__rapid-mlx-228",
-      "image": "swerebench/sweb.eval.x86_64.raullenchai_1776_rapid-mlx-228@sha256:4d04e8b05b4483be4f0c178c29717e5656c1731432bf45c8e5e89c5625989228",
-      "digest": "sha256:4d04e8b05b4483be4f0c178c29717e5656c1731432bf45c8e5e89c5625989228"
+      "instance_id": "pytorch__ignite-3532_interface",
+      "task_id": "pytorch__ignite-3532_interface",
+      "image": "swerebench/sweb.eval.x86_64.pytorch_1776_ignite-3532_interface@sha256:dba59ebc3ecdc6e95a9f8083ce398f685aa3ba0ee624893d57e3e098e221af12",
+      "digest": "sha256:dba59ebc3ecdc6e95a9f8083ce398f685aa3ba0ee624893d57e3e098e221af12"
+    },
+    {
+      "dataset": "nebius/SWE-rebench-leaderboard",
+      "revision": "34d5a58864acf91613740a09ec5d205228dcfa39",
+      "instance_id": "stravalib__stravalib-709_interface",
+      "task_id": "stravalib__stravalib-709_interface",
+      "image": "swerebench/sweb.eval.x86_64.stravalib_1776_stravalib-709_interface@sha256:5e0a4e7230f32ed2fb39f49aafd466349bd978930c0c28980c349348b68a6ac8",
+      "digest": "sha256:5e0a4e7230f32ed2fb39f49aafd466349bd978930c0c28980c349348b68a6ac8"
     },
     {
       "dataset": "nebius/SWE-rebench-leaderboard",
