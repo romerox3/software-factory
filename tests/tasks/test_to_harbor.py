@@ -100,6 +100,25 @@ def test_task_toml_and_dockerfile(tmp_path: Path) -> None:
     assert os.access(test_script, os.X_OK)
 
 
+def test_agent_timeout_sec_overrides_the_task_budget(tmp_path: Path) -> None:
+    generated = to_harbor(copy_visible_task(tmp_path), tmp_path / "out", agent_timeout_sec=1800)
+
+    config = tomllib.loads((generated / "task.toml").read_text(encoding="utf-8"))
+    assert config["agent"]["timeout_sec"] == 1800
+
+
+@pytest.mark.parametrize(
+    "timeout", [0, -1, True, 1.5, "1800"], ids=["zero", "negative", "bool", "float", "text"]
+)
+def test_agent_timeout_sec_rejects_invalid_values(tmp_path: Path, timeout: Any) -> None:
+    out_dir = tmp_path / "out"
+
+    with pytest.raises(ValueError, match="agent_timeout_sec"):
+        to_harbor(copy_visible_task(tmp_path), out_dir, agent_timeout_sec=timeout)
+
+    assert not out_dir.exists()
+
+
 def test_rebench_env_is_added_to_the_agent_image(tmp_path: Path) -> None:
     task_dir = copy_visible_task(tmp_path)
     write_task_config(

@@ -203,6 +203,7 @@ class FakeHarbor:
         self.active_by_provider: dict[str, int] = {}
         self.max_by_provider: dict[str, int] = {}
         self.environments: list[dict[str, str]] = []
+        self.argvs: list[list[str]] = []
         self._lock = threading.Lock()
 
     def __call__(
@@ -218,6 +219,7 @@ class FakeHarbor:
         with self._lock:
             self.calls += 1
             self.environments.append(dict(env))
+            self.argvs.append(list(argv))
             self.active += 1
             self.max_active = max(self.max_active, self.active)
             self.active_by_provider[provider] = self.active_by_provider.get(provider, 0) + 1

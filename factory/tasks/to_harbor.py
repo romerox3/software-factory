@@ -37,11 +37,17 @@ def to_harbor(
     *,
     executor: str | None = None,
     allowed_hosts: Sequence[str] = (),
+    agent_timeout_sec: int | None = None,
 ) -> Path:
-    """Write the Harbor task for ``visible_task_dir`` and return its path."""
+    """Write the Harbor task for ``visible_task_dir`` and return its path.
+
+    ``agent_timeout_sec`` overrides the task's own ``budget.timeout_sec``: the
+    matrix measures an arm, so the arm's wall clock must win over the task.
+    """
     visible_task_dir = Path(visible_task_dir)
     out_dir = Path(out_dir)
     hosts = _validated_hosts(allowed_hosts)
+    agent_timeout = _validated_agent_timeout(agent_timeout_sec)
 
     task = _load_task(visible_task_dir / "factory.task.json")
     _assert_no_hidden_material(visible_task_dir)
@@ -53,7 +59,7 @@ def to_harbor(
 
     workdir = workdir_of(task)
     instruction = render_prompt(_build_instruction(visible_task_dir, task_id), workdir)
-    task_toml = _build_task_toml(task, hosts)
+    task_toml = _build_task_toml(task, hosts, agent_timeout)
     snapshot = _snapshot_git(visible_task_dir)
     if snapshot is None and workdir != DEFAULT_WORKDIR:
         raise ValueError(
@@ -124,8 +130,14 @@ def _build_instruction(task_dir: Path, task_id: str) -> str:
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
-def _build_task_toml(task: dict[str, Any], allowed_hosts: Sequence[str] = ()) -> str:
-    timeout_sec = task["budget"]["timeout_sec"]
+def _build_task_toml(
+    task: dict[str, Any],
+    allowed_hosts: Sequence[str] = (),
+    agent_timeout_sec: int | None = None,
+) -> str:
+    timeout_sec = (
+        agent_timeout_sec if agent_timeout_sec is not None else task["budget"]["timeout_sec"]
+    )
     if allowed_hosts:
         network = (
             'network_mode = "allowlist"\n'
@@ -165,6 +177,18 @@ def _build_dockerfile(
         lines.extend(image_snippet(executor))
     lines.append(f"WORKDIR {workdir}")
     return "\n".join(lines) + "\n"
+
+
+def _validated_agent_timeout(agent_timeout_sec: int | None) -> int | None:
+    if agent_timeout_sec is None:
+        return None
+    if (
+        isinstance(agent_timeout_sec, bool)
+        or not isinstance(agent_timeout_sec, int)
+        or agent_timeout_sec < 1
+    ):
+        raise ValueError(f"agent_timeout_sec must be an integer >= 1: {agent_timeout_sec!r}")
+    return agent_timeout_sec
 
 
 def _validated_hosts(allowed_hosts: Sequence[str]) -> tuple[str, ...]:

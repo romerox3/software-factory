@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -664,14 +665,44 @@ def test_tasks_are_converted_once_per_executor_with_the_gateway_host(tmp_path: P
         (out_dir.relative_to(work).as_posix(), kwargs["executor"], kwargs["allowed_hosts"])
         for _visible, out_dir, kwargs in converter.calls
     ) == [
-        ("harbor/claude-code", "claude-code", ("gateway.example",)),
-        ("harbor/opencode", "opencode", ("gateway.example",)),
+        ("harbor/claude-code-t1800", "claude-code", ("gateway.example",)),
+        ("harbor/opencode-t1800", "opencode", ("gateway.example",)),
     ]
     environments = harbor.environments
     assert any(
         env.get("ANTHROPIC_BASE_URL") == "http://gateway.example:4000" for env in environments
     )
     assert any(env.get("OPENAI_BASE_URL") == url for env in environments)
+
+
+def test_arm_wall_clock_sets_the_harbor_agent_timeout(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(
+        tmp_path / "arms.json",
+        [
+            arm("A1", budget={"usd": 2.0, "wall_s": 900, "max_turns": 60}),
+            arm("A6", budget={"usd": 2.0, "wall_s": 1800, "max_turns": 60}),
+        ],
+        max_parallel=2,
+    )
+    work = tmp_path / "work"
+    harbor = FakeHarbor()
+
+    code = main(_run_args(store, arms, tmp_path / "out", work), deps=_deps(harbor=harbor))
+
+    assert code == 0
+    timeouts = {}
+    for wall_s in (900, 1800):
+        task_dir = work / "harbor" / f"claude-code-t{wall_s}" / TASK_ID
+        config = tomllib.loads((task_dir / "task.toml").read_text(encoding="utf-8"))
+        timeouts[wall_s] = config["agent"]["timeout_sec"]
+    assert timeouts == {900: 900, 1800: 1800}
+    assert {
+        argv[argv.index("--path") + 1]: argv[argv.index("--job-name") + 1] for argv in harbor.argvs
+    } == {
+        str(work / "harbor" / "claude-code-t900" / TASK_ID): "a1-demo-task-r1-a1",
+        str(work / "harbor" / "claude-code-t1800" / TASK_ID): "a6-demo-task-r1-a1",
+    }
 
 
 def test_gateway_url_defaults_to_the_environment(

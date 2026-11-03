@@ -692,10 +692,23 @@ def _harbor_input(document: Mapping[str, Any]) -> dict[str, Any]:
     return {**document, "model": {"gateway_alias": alias}}
 
 
+def _wall_s(arm: Arm) -> int:
+    return int(arm.budget["wall_s"])
+
+
+def _harbor_task_dir(work: Path, executor: str, wall_s: int, task_id: str) -> Path:
+    """Harbor task dir per (executor, arm wall clock, task).
+
+    Arms with the same executor and different wall clocks must never share a
+    converted task, or the first conversion's ``[agent] timeout_sec`` sticks.
+    """
+    return work / "harbor" / f"{executor}-t{wall_s}" / task_id
+
+
 def _harbor_command(run: PlannedRun, document: Mapping[str, Any], work: Path, gateway_url: str):
     return build_harbor_command(
         _harbor_input(document),
-        task_dir=work / "harbor" / run.arm.executor / run.task_id,
+        task_dir=_harbor_task_dir(work, run.arm.executor, _wall_s(run.arm), run.task_id),
         jobs_dir=work / "jobs",
         gateway_url=gateway_url,
         model_limits=run.arm.model_limits,
@@ -1308,7 +1321,7 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
         return 0
 
     planned_tasks = sorted({run.task_id for run in plan})
-    planned_executors = sorted({run.arm.executor for run in plan})
+    planned_executor_walls = sorted({(run.arm.executor, _wall_s(run.arm)) for run in plan})
     task_documents = {task_id: load_task_document(args.store, task_id) for task_id in planned_tasks}
 
     if args.dry_run:
@@ -1326,7 +1339,9 @@ def _run_command(args: argparse.Namespace, deps: Deps) -> int:
         if isinstance(client, KeyPool):
             for run in plan:
                 client.check_budget(float(run.arm.budget["usd"]))
-        converted, conversion_errors = _convert_tasks(planned_tasks, planned_executors, args, deps)
+        converted, conversion_errors = _convert_tasks(
+            planned_tasks, planned_executor_walls, args, deps
+        )
         semaphores = {
             provider: threading.Semaphore(limit) for provider, limit in matrix.providers.items()
         }
@@ -1400,25 +1415,25 @@ def _key_client(args: argparse.Namespace, deps: Deps) -> tuple[KeyClient, bool]:
 
 def _convert_tasks(
     task_ids: Sequence[str],
-    executors: Sequence[str],
+    executor_walls: Sequence[tuple[str, int]],
     args: argparse.Namespace,
     deps: Deps,
-) -> tuple[dict[tuple[str, str], Path], dict[tuple[str, str], str]]:
-    converted: dict[tuple[str, str], Path] = {}
-    errors: dict[tuple[str, str], str] = {}
+) -> tuple[dict[tuple[str, int, str], Path], dict[tuple[str, int, str], str]]:
+    converted: dict[tuple[str, int, str], Path] = {}
+    errors: dict[tuple[str, int, str], str] = {}
     hosts = (args.gateway_host,)
-    for executor in executors:
-        harbor_dir = args.work / "harbor" / executor
+    for executor, wall_s in executor_walls:
         for task_id in task_ids:
-            key = (executor, task_id)
-            target = harbor_dir / task_id
+            key = (executor, wall_s, task_id)
+            target = _harbor_task_dir(args.work, executor, wall_s, task_id)
             try:
                 if not (target.is_dir() and any(target.iterdir())):
                     deps.to_harbor(
                         args.store / "visible" / task_id,
-                        harbor_dir,
+                        target.parent,
                         executor=executor,
                         allowed_hosts=hosts,
+                        agent_timeout_sec=wall_s,
                     )
                 converted[key] = target
             except Exception as exc:  # noqa: BLE001 - one bad task must not abort the matrix
@@ -1433,15 +1448,15 @@ def _run_one(
     deps: Deps,
     client: KeyClient,
     semaphores: Mapping[str, threading.Semaphore],
-    converted: Mapping[tuple[str, str], Path],
-    conversion_errors: Mapping[tuple[str, str], str],
+    converted: Mapping[tuple[str, int, str], Path],
+    conversion_errors: Mapping[tuple[str, int, str], str],
     stop: threading.Event,
 ) -> bool:
     if stop.is_set():
         return False
     semaphore = semaphores[run.arm.provider]
     holder: dict[str, Any] = {}
-    key = (run.arm.executor, run.task_id)
+    key = (run.arm.executor, _wall_s(run.arm), run.task_id)
     with semaphore:
         if stop.is_set():
             return False
