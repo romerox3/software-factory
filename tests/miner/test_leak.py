@@ -45,3 +45,64 @@ def test_returns_sorted_identifiers_and_skips_diff_headers(tmp_path: Path) -> No
         "Decimal",
         "ROUND_HALF_UP",
     ]
+
+
+def test_identifiers_declared_by_the_task_are_not_leaks(tmp_path: Path) -> None:
+    base = make_base(tmp_path, "def round_value(x):\n    return x\n")
+    gold = (
+        "diff --git a/calc.py b/calc.py\n"
+        "--- a/calc.py\n"
+        "+++ b/calc.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def round_value(x):\n"
+        "-    return x\n"
+        "+    return _quote_identifier(x)\n"
+    )
+    spec = "Keep round_value working.\n\n## Interface\n\nName: `_quote_identifier`\n"
+
+    assert detect_leak(spec, gold, base, declared="Name: `_quote_identifier`") == []
+    assert detect_leak(spec, gold, base) == ["_quote_identifier"]
+
+
+def test_ignores_identifiers_added_only_in_comments_and_docstrings(tmp_path: Path) -> None:
+    base = make_base(tmp_path, "def round_value(x):\n    return x\n")
+    gold = (
+        "--- a/calc.py\n"
+        "+++ b/calc.py\n"
+        "@@ -1,2 +1,4 @@\n"
+        " def round_value(x):\n"
+        "+    # when half of the daily quota is used\n"
+        '+    """Because the coercion is native."""\n'
+        "     return x\n"
+    )
+    spec = "The quota applies because coercion is native."
+
+    assert detect_leak(spec, gold, base) == []
+
+
+def test_identifiers_added_as_code_still_leak(tmp_path: Path) -> None:
+    base = make_base(tmp_path, "def round_value(x):\n    return x\n")
+    gold = (
+        "--- a/calc.py\n"
+        "+++ b/calc.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def round_value(x):\n"
+        "-    return x\n"
+        "+    quota = 3\n"
+    )
+
+    assert detect_leak("Set the quota.", gold, base) == ["quota"]
+
+
+def test_identifiers_added_only_in_documentation_do_not_leak(tmp_path: Path) -> None:
+    base = make_base(tmp_path, "def round_value(x):\n    return x\n")
+    gold = (
+        "diff --git a/CHANGELOG.md b/CHANGELOG.md\n"
+        "--- a/CHANGELOG.md\n"
+        "+++ b/CHANGELOG.md\n"
+        "@@ -1 +1,2 @@\n"
+        " Old notes.\n"
+        "+Added quota support because of coercion.\n"
+    )
+
+    assert detect_leak("The quota applies because of coercion.", gold, base) == []

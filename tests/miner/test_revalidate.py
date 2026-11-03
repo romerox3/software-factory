@@ -271,6 +271,32 @@ def test_spec_leak_is_rejected(tmp_path: Path) -> None:
     assert not (store / "visible" / TASK_ID / "snapshot").exists()
 
 
+def test_interface_section_is_not_a_spec_leak(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    proposal = store / "visible" / TASK_ID / "openspec" / "changes" / TASK_ID / "proposal.md"
+    proposal.write_text(
+        "Round ties away from zero.\n\n## Interface\n\n- `Decimal`\n", encoding="utf-8"
+    )
+
+    result = revalidate(store, TASK_ID, PY_CALC, LocalRunner(), seed=1)
+
+    assert result["valid"] is True
+    assert result["reason"] == "ok"
+
+
+def test_the_same_name_outside_the_interface_section_is_a_spec_leak(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    copy_round_task(store)
+    proposal = store / "visible" / TASK_ID / "openspec" / "changes" / TASK_ID / "proposal.md"
+    proposal.write_text("Round ties away from zero with `Decimal`.\n", encoding="utf-8")
+
+    result = revalidate(store, TASK_ID, PY_CALC, LocalRunner(), seed=1)
+
+    assert result["valid"] is False
+    assert result["reason"] == "spec_leak"
+
+
 def test_valid_task_snapshot_has_a_single_commit(tmp_path: Path) -> None:
     store = tmp_path / "store"
     copy_round_task(store)

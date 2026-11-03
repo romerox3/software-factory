@@ -113,14 +113,16 @@ def revalidate(
     result["flaky"] = flaky
     result["known_failures"] = known_failures
 
+    proposal_text = proposal_path.read_text(encoding="utf-8")
     if not f2p:
         result["reason"] = "no_f2p"
     elif flaky:
         result["reason"] = "flaky"
     elif detect_leak(
-        proposal_path.read_text(encoding="utf-8"),
+        proposal_text,
         gold_patch.read_text(encoding="utf-8"),
         base_repo,
+        declared=_interface_section(proposal_text),
     ):
         result["reason"] = "spec_leak"
     else:
@@ -136,6 +138,28 @@ def revalidate(
 
     _write_json(hidden / "revalidation.json", result)
     return result
+
+
+def _interface_section(proposal: str) -> str:
+    """Return the proposal's ``## Interface`` section, empty when it has none.
+
+    The importer appends the interface the task declares on purpose, so those names
+    are fair game for the spec and must not read as a leak.
+    """
+    lines = proposal.splitlines(keepends=True)
+    start = None
+    for index, line in enumerate(lines):
+        if line.startswith("## Interface") and not line[len("## Interface") :].strip():
+            start = index
+            break
+    if start is None:
+        return ""
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if lines[index].startswith("## "):
+            end = index
+            break
+    return "".join(lines[start:end])
 
 
 def _workdir(task_path: Path) -> str:
