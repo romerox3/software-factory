@@ -87,6 +87,10 @@ Los identificadores `F0-NN` se mantienen. Estado a 2026-11-03: F0-01 a F0-16 y F
 - **P2, tests F2P** (0–3): 0, aceptan cualquier solución razonable de lo que pide la spec; 1, aceptan casi todas; 2, rechazan soluciones razonables porque exigen nombres, firmas o formatos que no se deducen de la spec ni del repo; 3, comprueban algo que la spec no pide.
 - La tarea sale del análisis principal si P1 ≥ 2 o P2 ≥ 2. El informe de la fase A da también las cifras con las 35, como análisis de sensibilidad.
 - La auditoría es un paso obligatorio de la importación: ninguna tarea entra en un conjunto congelado sin ella.
+- **Resultado y decisiones (2026-11-03).** La auditoría excluye 19 de las 35 tareas y conserva 16 [Cierto, hoja en el almacén privado]. El propietario decide:
+  - la matriz deja de ejecutar las excluidas, y lo ya ejecutado de ellas se guarda aparte; esto sustituye al análisis de sensibilidad con las 35, y se decidió antes de ver el agregado;
+  - se mantiene el umbral fijado, sin recuperar los casos frontera.
+- **Ampliación del conjunto.** La auditoría se hace antes de importar, sobre las filas públicas del dataset (enunciado, `interface`, parche de tests y gold), y solo se importan y revalidan las que pasan. Se priorizan las tareas con `interface`: las 3 del conjunto v1 que lo traían pasaron, y ninguna de las 19 excluidas lo traía [Cierto]. Las nuevas entran en la matriz como tandas adicionales, con el mismo código y los mismos brazos.
 - La audita un subagente que no ve los resultados de los brazos, solo la spec visible, el repo en el commit base, el parche de tests, el gold y la lista F2P. El orquestador no puede hacerlo a ciegas porque ya vio la primera tanda. Las tareas que el auditor marque como dudosas se le preguntan al propietario. Se descarta la tarea; la spec no se reescribe.
 
 **Convenciones de despacho** (ver [CLAUDE.md](../CLAUDE.md)):
