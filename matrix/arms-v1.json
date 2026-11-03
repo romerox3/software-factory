@@ -28,7 +28,7 @@
     {
       "id": "A2",
       "executor": "codex",
-      "gateway_alias": "factory/glm-5.3",
+      "gateway_alias": "factory/glm-5.3-flash",
       "billing": "plan",
       "model_limits": {
         "context": 200000,
@@ -45,7 +45,7 @@
     {
       "id": "A3",
       "executor": "opencode",
-      "gateway_alias": "factory/glm-5.3",
+      "gateway_alias": "factory/glm-5.3-flash",
       "billing": "plan",
       "model_limits": {
         "context": 200000,
@@ -96,7 +96,7 @@
     {
       "id": "A6",
       "executor": "claude-code",
-      "gateway_alias": "factory/glm-5.3",
+      "gateway_alias": "factory/glm-5.3-flash",
       "billing": "plan",
       "model_limits": {
         "context": 200000,
