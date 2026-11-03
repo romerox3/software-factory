@@ -6,6 +6,7 @@ import json
 import os
 import re
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -338,6 +339,48 @@ def test_one_run_writes_the_dataset_layout(tmp_path: Path) -> None:
     assert dataset.records[0].verdict == "reject"
     assert dataset.records[0].cost_usd == 0.25
     assert dataset.records[0].diff_text
+
+
+def test_stale_job_dir_is_quarantined_before_harbor_runs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    work = tmp_path / "work"
+    run_id = "a1-demo-task-r1-a1"
+    old_result = work / "jobs" / run_id / "trial__old" / "result.json"
+    old_result.parent.mkdir(parents=True)
+    old_result.write_text('{"agent_timeout_error": "stale"}', encoding="utf-8")
+    harbor = FakeHarbor()
+    deps = Deps(
+        key_client=FakeKeys(),
+        harbor=harbor,
+        verifier=FakeVerifier(),
+        docker=FakeDocker(),
+        clock=lambda: datetime(2026, 3, 4, 5, 6, 7, tzinfo=UTC),
+    )
+
+    code = main(_run_args(store, arms, out, work), deps=deps)
+
+    assert code == 0
+    assert harbor.job_dir_entries == [[]]
+    stale = work / "jobs" / f"{run_id}.stale-20260304T050607Z"
+    assert (stale / "trial__old" / "result.json").read_text() == '{"agent_timeout_error": "stale"}'
+    assert sorted(path.name for path in (work / "jobs" / run_id).iterdir()) == ["trial__fake"]
+    assert f"{run_id}: previous job dir moved to {stale}" in capsys.readouterr().err
+
+
+def test_absent_job_dir_is_not_quarantined(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    work = tmp_path / "work"
+
+    code = main(_run_args(store, arms, out, work), deps=_deps())
+
+    assert code == 0
+    assert not list((work / "jobs").glob("*.stale-*"))
 
 
 def test_cost_goes_to_shadow_for_plan_arms_and_real_for_api_arms(tmp_path: Path) -> None:

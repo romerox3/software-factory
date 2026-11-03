@@ -204,6 +204,7 @@ class FakeHarbor:
         self.max_by_provider: dict[str, int] = {}
         self.environments: list[dict[str, str]] = []
         self.argvs: list[list[str]] = []
+        self.job_dir_entries: list[list[str]] = []
         self._lock = threading.Lock()
 
     def __call__(
@@ -234,7 +235,11 @@ class FakeHarbor:
             if self.trial_source is not None:
                 run_id = argv[argv.index("--job-name") + 1]
                 jobs_dir = Path(argv[argv.index("--jobs-dir") + 1])
-                target = jobs_dir / run_id / "trial__fake"
+                job_dir = jobs_dir / run_id
+                self.job_dir_entries.append(
+                    sorted(path.name for path in job_dir.iterdir()) if job_dir.is_dir() else []
+                )
+                target = job_dir / "trial__fake"
                 shutil.rmtree(target, ignore_errors=True)
                 shutil.copytree(self.trial_source, target)
             return subprocess.CompletedProcess(list(argv), 0, "", "")

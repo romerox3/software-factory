@@ -804,12 +804,27 @@ def ensure_task_image(image: str, deps: Deps) -> None:
             raise RuntimeError(f"docker pull {image} failed: {detail[:300]}")
 
 
+def _quarantine_job_dir(job_dir: Path, run_id: str, now: datetime) -> None:
+    """Keep Harbor from resuming a finished trial left in this run's job dir.
+
+    A re-run keeps the same ``run_id`` and therefore the same
+    ``work/jobs/<run_id>``, where Harbor finds the previous trial and returns it
+    without running the agent. Leave the old dir where it is but out of reach.
+    """
+    if not job_dir.is_dir() or not any(job_dir.iterdir()):
+        return
+    stale = job_dir.with_name(f"{job_dir.name}.stale-{now.strftime('%Y%m%dT%H%M%SZ')}")
+    job_dir.rename(stale)
+    print(f"{run_id}: previous job dir moved to {stale}", file=sys.stderr)
+
+
 def _execute_attempt(
     attempt: _Attempt, args: argparse.Namespace, deps: Deps, client: KeyClient
 ) -> None:
     run = attempt.run
     started = deps.clock()
     command = _harbor_command(run, attempt.input_document, args.work, args.gateway_url)
+    _quarantine_job_dir(args.work / "jobs" / run.run_id, run.run_id, started)
     key = client.mint(
         run.arm.data_class,
         float(run.arm.budget["usd"]),
