@@ -4,11 +4,11 @@ Agent Swarm's ``script`` node runs inside the API container without Docker, so i
 cannot start the verifier itself. It POSTs ``{"run_id", "task_id"}`` here instead.
 The service takes the worker's directory, turns it into a diff against the snapshot
 base, and hands only those bytes to ``python -m factory.verifier`` (rule 3). It
-listens on the gateway IP of the compose ``verifier`` network, which only the API
-container joins, so the worker cannot reach it.
+listens on a Unix socket that only the verifier relay mounts; the relay sits on the
+internal ``verifier`` network that only the API joins, so the worker cannot reach it.
 
 Usage (from the factory checkout, with its venv):
-    python spikes/02-agent-swarm/verifier_service.py --store S --work W --out O
+    python spikes/02-agent-swarm/verifier_service.py --store S --work W --out O --socket P
 """
 
 from __future__ import annotations
@@ -16,10 +16,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import socketserver
 import subprocess
 import sys
 import tempfile
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,160}$")
@@ -121,6 +122,9 @@ def make_handler(store: Path, work: Path, out: Path) -> type[BaseHTTPRequestHand
             self.end_headers()
             self.wfile.write(data)
 
+        def address_string(self) -> str:
+            return "relay"  # Unix-socket peers have no address
+
     return Handler
 
 
@@ -129,10 +133,12 @@ def main() -> int:
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--bind", default="172.31.241.1")
-    parser.add_argument("--port", type=int, default=8787)
+    parser.add_argument("--socket", type=Path, required=True)
     args = parser.parse_args()
-    server = ThreadingHTTPServer((args.bind, args.port), make_handler(args.store, args.work, args.out))
+    args.socket.unlink(missing_ok=True)
+    server = socketserver.ThreadingUnixStreamServer(
+        str(args.socket), make_handler(args.store, args.work, args.out)
+    )
     server.serve_forever()
     return 0
 

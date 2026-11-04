@@ -4,9 +4,14 @@
 #
 # Networks:
 #   swarm-int  internal, no route out. Every service except the egress proxy.
-#   egress     the only network with a route out; only the egress proxy is on it.
-#   verifier   api only; the host-side verifier service listens on its gateway IP,
-#              so the worker cannot reach the verifier (rule 3).
+#   egress     a routed network; only the egress proxy is on it.
+#   host-port  a routed network for the api-port relay, which publishes the api on
+#              127.0.0.1:3013 (Docker publishes no ports of internal-only services).
+#   verifier   internal: the api and the verifier relay. The worker is not on it,
+#              so it cannot reach the verifier (rule 3).
+# The relay forwards to the host-side verifier service through a Unix socket in
+# VERIFIER_SOCKET_DIR, so it needs no route to the host. With no routed network the
+# api also cannot run its hard-coded models.dev catalog refresh (no off switch).
 # The worker resolves the gateway host to the egress proxy, which forwards raw TCP
 # to the gateway on 443: TLS stays end to end and nothing else is reachable.
 
@@ -22,6 +27,8 @@ x-claude-gateway: &claude-gateway
   ANTHROPIC_DEFAULT_OPUS_MODEL: ${WORKER_MODEL}
   ANTHROPIC_DEFAULT_SONNET_MODEL: ${WORKER_MODEL}
   ANTHROPIC_DEFAULT_HAIKU_MODEL: ${WORKER_MODEL}
+  # The context-mode plugin's tool hook runs `npm install`, which hangs with no egress.
+  CONTEXT_MODE_DISABLED: "true"
 
 services:
   minio:
@@ -102,8 +109,6 @@ services:
       SLACK_DISABLE: "true"
       GITHUB_DISABLE: "true"
       RUNTIME_POOLS_ENABLED: "false"
-    ports:
-      - "127.0.0.1:3013:3013"
     volumes:
       - swarm_api_data:/app/data
     secrets:
@@ -126,6 +131,22 @@ services:
       swarm-int:
         ipv4_address: 172.31.240.250
       egress: {}
+    restart: unless-stopped
+
+  api-port:
+    image: ${SOCAT_IMAGE}
+    command: ["TCP-LISTEN:3013,fork,reuseaddr", "TCP:api:3013"]
+    ports:
+      - "127.0.0.1:3013:3013"
+    networks: [swarm-int, host-port]
+    restart: unless-stopped
+
+  verifier-proxy:
+    image: ${SOCAT_IMAGE}
+    command: ["TCP-LISTEN:8787,fork,reuseaddr", "UNIX-CONNECT:/run/verifier/verifier.sock"]
+    volumes:
+      - ${VERIFIER_SOCKET_DIR}:/run/verifier
+    networks: [verifier]
     restart: unless-stopped
 
   worker:
@@ -186,11 +207,12 @@ networks:
       config:
         - subnet: 172.31.240.0/24
   egress: {}
+  host-port: {}
   verifier:
+    internal: true
     ipam:
       config:
         - subnet: 172.31.241.0/24
-          gateway: 172.31.241.1
 
 secrets:
   encryption_key:

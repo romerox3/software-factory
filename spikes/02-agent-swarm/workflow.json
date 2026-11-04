@@ -19,7 +19,7 @@
         "agentId": "__WORKER_AGENT_ID__",
         "dir": "/workspace/tasks/{{trigger.run_id}}",
         "tags": ["factory-spike"],
-        "template": "You are working in the repository at /workspace/tasks/{{trigger.run_id}}. Resolve the issue below by editing files in that repository only. Do not commit, do not push and do not open pull requests. When you are done, reply with a one-line summary.\n\n{{trigger.statement}}"
+        "template": "{{trigger.statement}}\n\nDo not push and do not open pull requests. When you are done, reply with a one-line summary."
       },
       "next": ["verify"]
     },
@@ -34,7 +34,7 @@
           "RUN_ID": "{{trigger.run_id}}",
           "TASK_ID": "{{trigger.task_id}}"
         },
-        "script": "#!/usr/bin/env bash\nset -euo pipefail\ncurl -sS --fail-with-body --max-time 290 -X POST http://172.31.241.1:8787/verify -H 'content-type: application/json' -d \"{\\\"run_id\\\":\\\"$RUN_ID\\\",\\\"task_id\\\":\\\"$TASK_ID\\\"}\"\n"
+        "script": "#!/usr/bin/env bash\nset -euo pipefail\ncurl -sS --fail-with-body --max-time 290 -X POST http://verifier-proxy:8787/verify -H 'content-type: application/json' -d \"{\\\"run_id\\\":\\\"$RUN_ID\\\",\\\"task_id\\\":\\\"$TASK_ID\\\"}\"\n"
       }
     }
   ]

@@ -2,7 +2,8 @@
 # Drives the spike on the tower: one workflow run per task and repetition.
 # Usage: run_spike.sh <tasks-file> <repetitions>
 # Each run gets a fresh copy of the task snapshot (no history, no hidden tests) in
-# SPIKE_WORK_DIR, is triggered through the swarm API and is polled until it ends.
+# SPIKE_WORK_DIR and the matrix base prompt (prompts/base-v1.md) around the task, is
+# triggered through the swarm API and is polled until it ends.
 # Results go to $OUT/results.jsonl: the node path (criterion 1) and the verdict.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -20,6 +21,26 @@ mkdir -p "$OUT" "$SPIKE_WORK_DIR"
 
 wf_file=$OUT/workflow.id
 if [ ! -s "$wf_file" ]; then
+  # A fresh install seeds enabled schedules (daily reports, an update check, nightly
+  # "dreaming") that hand tasks to the worker on its key. Turn them all off.
+  for kind in schedules workflows; do
+    curl -sS --fail-with-body "${auth[@]}" "$api/api/$kind" | python3 -I -c '
+import json, sys
+d = json.load(sys.stdin)
+for x in d[sys.argv[1]] if isinstance(d, dict) else d:
+    if x.get("enabled"):
+        print(x["id"])' "$kind" | while read -r id; do
+      curl -sS --fail-with-body "${auth[@]}" -X PATCH "$api/api/$kind/$id" -d '{"enabled":false}' > /dev/null
+    done
+  done
+  # Workflow names are unique: drop a previous copy so edits to workflow.json apply.
+  curl -sS --fail-with-body "${auth[@]}" "$api/api/workflows" | python3 -I -c '
+import json, sys
+print("\n".join(w["id"] for w in json.load(sys.stdin) if w["name"] == sys.argv[1]))' \
+    "$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$here/workflow.json")" \
+    | while read -r id; do
+      [ -n "$id" ] && curl -sS --fail-with-body "${auth[@]}" -X DELETE "$api/api/workflows/$id" > /dev/null
+    done
   body=$(sed "s/__WORKER_AGENT_ID__/$WORKER_AGENT_ID/" "$here/workflow.json" | python3 -I -c '
 import json, sys
 w = json.load(sys.stdin)
@@ -39,10 +60,12 @@ while read -r task; do
     payload=$(cd "$CODE" && .venv/bin/python -I -c '
 import json, sys
 from pathlib import Path
+from factory.adapters.prompt import render_prompt
 from factory.tasks.to_harbor import _build_instruction
 store, task, run_id = sys.argv[1:4]
+task_text = _build_instruction(Path(store) / "visible" / task, task)
 print(json.dumps({"run_id": run_id, "task_id": task,
-                  "statement": _build_instruction(Path(store) / "visible" / task, task)}))' \
+                  "statement": render_prompt(task_text, "/workspace/tasks/" + run_id)}))' \
       "$STORE" "$task" "$run_id")
     started=$(date +%s)
     swarm_run=$(curl -sS --fail-with-body "${auth[@]}" -X POST "$api/api/workflows/$wf/trigger?wait=false" -d "$payload" \
