@@ -28,6 +28,8 @@
 
 ### B · De la spec al producto: perfil app web
 
+> **2026-11-04 ([ADR-0013](adr/0013-verification-layer-over-agent-swarm.md))**: la orquestación de las fases B y C (runner, entrada, UI, publicador) queda en pausa y se monta sobre Agent Swarm si pasa la prueba de corte. Siguen aquí los oráculos, el escritor y el ejecutor de escenarios ocultos, y el verificador. El «frontend de la propia factory» deja de ser material de la fase B.
+
 - **Objetivo**: que la factory construya una app web interna desde cero (login, formularios, listados, flujos de negocio) a partir de una spec aprobada, la despliegue en staging y la compruebe con escenarios ocultos. Cubre E2, E3, E4, E5 y E7 en staging.
 - **Por qué antes que el piloto**: no necesita código del cliente, prueba la parte nueva más arriesgada (el oráculo de producto) y es lo que más se parece a «construir cualquier software».
 - **Material**: 5 specs de apps internas pequeñas escritas por el orquestador y aprobadas por el propietario, más una app real: **el frontend de la propia factory** (decisión del 2026-11-02). Se construye contra un contrato de API con datos de prueba, para no depender de la fase C, y se conecta a la API real cuando exista. Las specs de [Vibe Code Bench](https://arxiv.org/abs/2603.04601) no son públicas [Probable], así que no hay conjunto externo con el que calibrar.

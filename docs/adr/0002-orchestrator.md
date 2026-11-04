@@ -1,6 +1,6 @@
 # ADR-0002 · Orquestador del pipeline
 
-- **Estado**: aceptada; revisada el 2026-11-01. El propietario cambia la tesis 8 (sección 4) y el formato pasa de DOT a YAML propio · **Fecha**: 2026-10-31
+- **Estado**: en pausa desde el 2026-11-04 por [ADR-0013](0013-verification-layer-over-agent-swarm.md); aceptada y revisada el 2026-11-01. El propietario cambia la tesis 8 (sección 4) y el formato pasa de DOT a YAML propio · **Fecha**: 2026-10-31
 
 ## Contexto
 
