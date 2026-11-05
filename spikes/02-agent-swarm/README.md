@@ -51,6 +51,33 @@ Si fallan el 2 o el 3, la plataforma queda bloqueada para código `client-produc
 - El worker trabaja con la imagen de Agent Swarm, no con la de la tarea: no tiene las dependencias para ejecutar los tests del repo. Comparar su pass@1 con el de la matriz no es justo; para eso haría falta un worker por imagen de tarea (los *runtime pools* de Agent Swarm, sin probar).
 - `agent-fs` arranca con `EMBEDDING_PROVIDER=local` en una red sin salida. Si necesita bajarse un modelo al arrancar, fallará y habrá que darle salida o cambiar el proveedor.
 
-## Resultados
+## Resultados (2026-11-04, Agent Swarm v2.7.10)
 
-Pendiente.
+Cinco tareas, dos repeticiones, un worker de Claude Code con `factory/glm-5.3-flash` y un tope de 25 min por ejecución. Los datos crudos están en el almacén privado (`spikes/02-agent-swarm/`).
+
+| Tarea | Spike | A6 en la matriz |
+|---|---|---|
+| psd-tools-551 | 2/2 | 5/5 |
+| loguru-1451 | 2/2 | 5/5 |
+| jsonpickle-588 | 2/2 | 4/5 |
+| narwhals-3480 | 0/2: una supera el tope, otra `reject` por `dg.skip-marker` | 3/5 |
+| markdown-1587 | 0/2: las dos superan el tope | 2/5 |
+
+Las tres tareas de control salen 6/6, así que la plataforma no estropea al worker [Cierto]. Las dos difíciles no se pueden comparar: la matriz daba a A6 30 min y 60 turnos, y aquí el tope era de 25 min sin límite de turnos.
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | Mismos nodos con la misma entrada | **Cumple.** Las 7 ejecuciones que terminaron siguieron `implement → verify`. Las 3 que superaron el tope se cancelaron en `implement`, y el worker cogió la siguiente sin arrastrar la anterior. El destino lo fija el `agentId` y ningún modelo elige ruta |
+| 2 | Todo pasa por el gateway con la virtual key | **Cumple.** 726 llamadas, todas con la clave del worker y a `factory/glm-5.3-flash` (38,9 M tokens). En el worker no hay más credenciales que esa clave y la `API_KEY` del swarm |
+| 3 | El worker solo alcanza el gateway | **Cumple.** Llega al gateway y a la API. pypi, github, `templates.agent-swarm.dev`, una IP pública, los puertos del host y `verifier-proxy` quedan cortados |
+| 4 | El verificador va aparte | **Cumple.** Todos los veredictos salen del servicio del host. El worker solo monta su directorio de trabajo y dos volúmenes del swarm; no ve `store/`. El verificador rechazó un diff que añadía un marcador de skip |
+| 5 | Sin túnel ni telemetría | **Cumple con la configuración de este directorio, no con la de serie.** Con salida a internet, la API descarga el catálogo de `models.dev`. Sin redes con ruta, durante las 10 ejecuciones solo abrió conexiones a 172.31.240.0/24 |
+
+Configuración de serie que hubo que cambiar. Para una instalación compartida, estos son requisitos:
+
+1. La API sin ruta a internet: la descarga de `models.dev` no se puede apagar.
+2. `CONTEXT_MODE_DISABLED=true` en los agentes, o el hook del plugin se cuelga sin salida.
+3. Desactivar las cuatro tareas programadas que vienen activas.
+4. El enunciado con el prompt base de la factory. Sin él, el worker editó los tests y el diff-guard lo rechazó.
+
+Veredicto para el ADR-0013: Agent Swarm puede ser la plataforma, con el verificador de la factory como nodo y estas cuatro condiciones. No se ha probado el lead (enrutado por modelo) ni los *runtime pools* con la imagen de cada tarea.
