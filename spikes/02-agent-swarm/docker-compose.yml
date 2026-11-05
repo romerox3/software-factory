@@ -188,6 +188,8 @@ services:
       API_KEY: ${API_KEY}
       AGENT_ID: ${LEAD_AGENT_ID}
       AGENT_ROLE: lead
+      # Own key, so the gateway separates the lead's routing cost from the worker's.
+      ANTHROPIC_AUTH_TOKEN: ${SWARM_LEAD_KEY}
       MCP_BASE_URL: http://api:3013
       AGENT_FS_API_URL: http://agent-fs:7433
       GITHUB_EMAIL: lead@localhost

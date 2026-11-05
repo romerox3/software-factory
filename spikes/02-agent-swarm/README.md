@@ -80,4 +80,10 @@ Configuración de serie que hubo que cambiar. Para una instalación compartida, 
 3. Desactivar las cuatro tareas programadas que vienen activas.
 4. El enunciado con el prompt base de la factory. Sin él, el worker editó los tests y el diff-guard lo rechazó.
 
-Veredicto para el ADR-0013: Agent Swarm puede ser la plataforma, con el verificador de la factory como nodo y estas cuatro condiciones. No se ha probado el lead (enrutado por modelo) ni los *runtime pools* con la imagen de cada tarea.
+### El lead (2026-11-05, psd-tools-551, una ejecución por variante)
+
+- **Con la tarea asignada al lead sin más indicaciones**, no delegó. Intentó hacerla él mismo, no encontró el repositorio (solo lo monta el worker) y abortó por el canal de aborto: 16 turnos en 200 s.
+- **Pidiéndole que delegue**, tardó 6 min en crear la subtarea. Reescribió el encargo y conservó las reglas de `base-v1` (tests de solo lectura, sin red), pero le quitó al worker el canal de aborto. Se dio por terminado sin esperar al worker, así que el nodo siguiente de un workflow habría verificado un directorio vacío. El worker tardó 25 min (con `agentId` fijado había tardado entre 8 y 14) y el verificador dio `accept`.
+- **Gasto en el gateway**, con una clave propia para el lead: 38 llamadas y 0,8 M tokens del lead en las dos pruebas, frente a 6 M del worker en esa tarea.
+
+Veredicto para el ADR-0013: Agent Swarm puede ser la plataforma, con el verificador de la factory como nodo y estas cuatro condiciones. Para cambios de código, workflow con `agentId` fijado: el lead no siempre delega y no espera al worker. No se han probado los *runtime pools* con la imagen de cada tarea.
