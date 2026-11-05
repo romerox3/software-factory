@@ -19,6 +19,8 @@ from pathlib import Path
 from factory.verifier.gitops import NEUTRAL_ATTRIBUTES, copy_tree, run_git
 
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+SECTION_START = re.compile(rb"(?m)^diff --git ")
+FACTORY_DIR = ".factory"
 # ``-c diff.external=`` unsets the external diff driver; the snapshot's config
 # never sets it, but an input mistake must not turn into an executed command.
 ISOLATED_CONFIG = (
@@ -113,6 +115,61 @@ def empty_diff() -> HostDiff:
         lines_added=0,
         lines_removed=0,
     )
+
+
+def split_factory_files(patch: bytes) -> tuple[bytes, dict[str, bytes]]:
+    """Remove every ``.factory/`` file section and return the added contents.
+
+    ``<workdir>/.factory/`` is the harness/agent side channel (prompt, abort
+    document), not part of the candidate change: it must never reach the
+    verifier or the stored diff. The rest of the patch is kept byte for byte.
+    """
+    starts = [match.start() for match in SECTION_START.finditer(patch)]
+    if not starts:
+        return patch, {}
+    parts = [patch[: starts[0]]]
+    factory_files: dict[str, bytes] = {}
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else len(patch)
+        section = patch[start:end]
+        path = _section_path(section)
+        if path is not None and path.startswith(FACTORY_DIR + "/"):
+            factory_files[path] = _added_content(section)
+        else:
+            parts.append(section)
+    return b"".join(parts), factory_files
+
+
+def _section_path(section: bytes) -> str | None:
+    header = section.split(b"\n", 1)[0]
+    match = re.fullmatch(rb"diff --git a/(.+) b/(.+)", header)
+    if match is None:
+        return None
+    try:
+        return match.group(2).decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def _added_content(section: bytes) -> bytes:
+    """The file a section adds, rebuilt from its ``+`` lines."""
+    content = b""
+    in_hunk = False
+    last_was_added = False
+    for line in section.split(b"\n"):
+        if line.startswith(b"@@"):
+            in_hunk = True
+            last_was_added = False
+        elif in_hunk and line.startswith(b"+"):
+            content += line[1:] + b"\n"
+            last_was_added = True
+        elif in_hunk and line == b"\\ No newline at end of file":
+            if last_was_added and content.endswith(b"\n"):
+                content = content[:-1]
+            last_was_added = False
+        else:
+            last_was_added = False
+    return content
 
 
 def _git(args: list[str], repo: Path, home: Path) -> bytes:

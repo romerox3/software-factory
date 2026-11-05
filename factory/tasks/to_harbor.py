@@ -67,9 +67,7 @@ def to_harbor(
             "the image's own history must not reach the agent"
         )
     dockerfile = _build_dockerfile(task, workdir, snapshot is not None, executor)
-    test_script = _build_test_script(
-        task["visible_tests"]["command"], workdir, snapshot_head(visible_task_dir)
-    )
+    test_script = _build_test_script(workdir, snapshot_head(visible_task_dir))
 
     out_dir.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=out_dir, prefix=f".{task_id}."))
@@ -224,7 +222,14 @@ def snapshot_head(task_dir: Path) -> str:
     return commit if completed.returncode == 0 and commit else "HEAD"
 
 
-def _build_test_script(command: str, workdir: str, base_commit: str) -> str:
+def _build_test_script(workdir: str, base_commit: str) -> str:
+    """Write the diff and a constant reward; never run the visible suite here.
+
+    Harbor's verifier has a fixed 120 s timeout and its reward is not a verdict:
+    the factory verifier decides on the host. A slow visible suite would hit
+    ``VerifierTimeoutError`` and lose the agent's diff, so ``test.sh`` only
+    exports the patch and writes a reward that says nothing about the outcome.
+    """
     checkout = shlex.quote(workdir)
     base = shlex.quote(base_commit)
     return (
@@ -239,9 +244,5 @@ def _build_test_script(command: str, workdir: str, base_commit: str) -> str:
         "  : > /logs/verifier/diff.patch\n"
         "fi\n"
         "\n"
-        f"if bash -c {shlex.quote(command)}; then\n"
-        "  echo 1 > /logs/verifier/reward.txt\n"
-        "else\n"
-        "  echo 0 > /logs/verifier/reward.txt\n"
-        "fi\n"
+        "echo 0 > /logs/verifier/reward.txt\n"
     )

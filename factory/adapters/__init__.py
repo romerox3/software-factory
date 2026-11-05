@@ -2,7 +2,7 @@
 
 from factory.adapters.abort import DEFAULT_ABORT_PATH, InvalidAbort, read_abort, validate_abort
 from factory.adapters.config import EXECUTORS, AgentConfig, agent_config, image_snippet
-from factory.adapters.diff import HostDiff, compute_diff, empty_diff
+from factory.adapters.diff import HostDiff, compute_diff, empty_diff, split_factory_files
 from factory.adapters.exit import (
     ABORT_SPEC_CONFLICT,
     BUDGET_EXCEEDED,
@@ -53,6 +53,7 @@ __all__ = [
     "prompt_text",
     "read_abort",
     "reconcile_cost",
+    "split_factory_files",
     "validate_abort",
     "validate_run_document",
     "write_run_document",

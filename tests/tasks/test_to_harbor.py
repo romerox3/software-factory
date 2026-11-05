@@ -96,7 +96,7 @@ def test_task_toml_and_dockerfile(tmp_path: Path) -> None:
     test_script = generated / "tests" / "test.sh"
     contents = test_script.read_text(encoding="utf-8")
     assert contents.startswith("#!/usr/bin/env bash\nset -euo pipefail\n")
-    assert TASK["visible_tests"]["command"] in contents
+    assert TASK["visible_tests"]["command"] not in contents
     assert os.access(test_script, os.X_OK)
 
 
@@ -137,7 +137,7 @@ def test_rebench_env_is_added_to_the_agent_image(tmp_path: Path) -> None:
         "WORKDIR /workspace",
     ]
     test_script = (generated / "tests" / "test.sh").read_text(encoding="utf-8")
-    assert f"{REBENCH_ENV_PREFIX}python -m pytest -q tests/visible" in test_script
+    assert f"{REBENCH_ENV_PREFIX}python -m pytest -q tests/visible" not in test_script
 
 
 def test_existing_task_directory_is_rejected(tmp_path: Path) -> None:
@@ -384,8 +384,8 @@ def test_test_script_exports_the_diff_against_the_snapshot_commit(tmp_path: Path
         "cd /workspace && git add -A && "
         f"git diff --cached --binary {commit} > /logs/verifier/diff.patch"
     ) in script
-    assert script.index("diff.patch") < script.index(TASK["visible_tests"]["command"])
-    assert "echo 1 > /logs/verifier/reward.txt" in script
+    assert TASK["visible_tests"]["command"] not in script
+    assert "echo 0 > /logs/verifier/reward.txt" in script
 
 
 def test_test_script_uses_head_without_a_snapshot(tmp_path: Path) -> None:

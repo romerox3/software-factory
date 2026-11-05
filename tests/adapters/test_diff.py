@@ -6,11 +6,45 @@ from pathlib import Path
 
 import pytest
 
-from factory.adapters import compute_diff, empty_diff
+from factory.adapters import compute_diff, empty_diff, split_factory_files
 
 from .support import append_file, export_workspace, make_snapshot, set_file
 
 TRAP_ATTRIBUTES = "tests/** -diff -text\n*.py filter=cleanpy diff=pycalc\n"
+
+CODE_PATCH = (
+    b"diff --git a/src/calc.py b/src/calc.py\n"
+    b"index 1111111..2222222 100644\n"
+    b"--- a/src/calc.py\n"
+    b"+++ b/src/calc.py\n"
+    b"@@ -1,2 +1,2 @@\n"
+    b"-old\n"
+    b"+new\n"
+    b" keep\n"
+)
+
+ABORT_PATCH = (
+    b"diff --git a/.factory/abort.json b/.factory/abort.json\n"
+    b"new file mode 100644\n"
+    b"index 0000000..1111111\n"
+    b"--- /dev/null\n"
+    b"+++ b/.factory/abort.json\n"
+    b"@@ -0,0 +1 @@\n"
+    b'+{"reason": "spec and tests disagree"}\n'
+)
+
+BINARY_PATCH = (
+    b"diff --git a/asset.bin b/asset.bin\n"
+    b"new file mode 100644\n"
+    b"index 0000000..2222222\n"
+    b"GIT binary patch\n"
+    b"literal 3\n"
+    b"KcmZ?0N?A=0\n"
+    b"\n"
+    b"literal 0\n"
+    b"HcmV?d00001\n"
+    b"\n"
+)
 
 
 def _change(workspace: Path) -> None:
@@ -93,3 +127,31 @@ def test_bad_inputs_are_rejected(tmp_path: Path) -> None:
         compute_diff(workspace, tmp_path / "missing", base)
     with pytest.raises(ValueError, match="40-character"):
         compute_diff(workspace, snapshot / ".git", "abc")
+
+
+def test_split_factory_files_keeps_a_patch_without_factory_files() -> None:
+    kept, files = split_factory_files(CODE_PATCH)
+
+    assert kept == CODE_PATCH
+    assert files == {}
+
+
+def test_split_factory_files_removes_the_only_factory_file() -> None:
+    kept, files = split_factory_files(ABORT_PATCH)
+
+    assert kept == b""
+    assert files == {".factory/abort.json": b'{"reason": "spec and tests disagree"}\n'}
+
+
+def test_split_factory_files_keeps_code_byte_for_byte() -> None:
+    kept, files = split_factory_files(ABORT_PATCH + CODE_PATCH)
+
+    assert kept == CODE_PATCH
+    assert files == {".factory/abort.json": b'{"reason": "spec and tests disagree"}\n'}
+
+
+def test_split_factory_files_does_not_touch_binary_sections() -> None:
+    kept, files = split_factory_files(ABORT_PATCH + BINARY_PATCH)
+
+    assert kept == BINARY_PATCH
+    assert files == {".factory/abort.json": b'{"reason": "spec and tests disagree"}\n'}

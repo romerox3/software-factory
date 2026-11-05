@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -590,6 +591,51 @@ def test_agent_timeout_after_execution_keeps_map_exit(tmp_path: Path) -> None:
     assert run_document["exit"] == "budget_exceeded"
     verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
     assert verdict["verdict"] == "reject"
+
+
+def test_abort_channel_is_honored_without_calling_the_verifier(tmp_path: Path) -> None:
+    store = write_store(tmp_path)
+    arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
+    out = tmp_path / "out"
+    trial = tmp_path / "abort-trial"
+    shutil.copytree(FIXTURES / "harbor_trial", trial)
+    (trial / "verifier" / "diff.patch").write_bytes(
+        b"diff --git a/.factory/abort.json b/.factory/abort.json\n"
+        b"new file mode 100644\n"
+        b"index 0000000..1111111\n"
+        b"--- /dev/null\n"
+        b"+++ b/.factory/abort.json\n"
+        b"@@ -0,0 +1 @@\n"
+        b'+{"reason": "spec and tests disagree"}\n'
+        b"diff --git a/src/calc.py b/src/calc.py\n"
+        b"index 1111111..2222222 100644\n"
+        b"--- a/src/calc.py\n"
+        b"+++ b/src/calc.py\n"
+        b"@@ -1,2 +1,2 @@\n"
+        b"-old\n"
+        b"+new\n"
+        b" keep\n"
+    )
+    verifier = FakeVerifier()
+
+    code = main(
+        _run_args(store, arms, out, tmp_path / "work"),
+        deps=_deps(harbor=FakeHarbor(trial_source=trial), verifier=verifier),
+    )
+
+    run_id = "a1-demo-task-r1-a1"
+    assert code == 0
+    assert verifier.calls == []
+    run_document = json.loads((out / "runs" / f"{run_id}.json").read_text())
+    assert run_document["exit"] == "abort_spec_conflict"
+    assert run_document["abort"] == {"reason": "spec and tests disagree"}
+    run_diff = (out / "runs" / f"{run_id}.diff").read_bytes()
+    assert b".factory/" not in run_diff
+    assert b"src/calc.py" in run_diff
+    assert b"+new\n" in run_diff
+    verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
+    assert verdict["verdict"] == "reject"
+    assert verdict["category"] == "abort_spec_conflict"
 
 
 def test_verifier_that_writes_nothing_becomes_error_infra(tmp_path: Path) -> None:

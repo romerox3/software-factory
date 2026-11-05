@@ -41,10 +41,10 @@ from urllib.parse import quote, urlsplit
 import httpx
 import jsonschema
 
-from factory.adapters.abort import abort_path_for
+from factory.adapters.abort import InvalidAbort, abort_path_for, validate_abort
 from factory.adapters.config import GATEWAY_BASE_URL, AgentConfig, agent_config
-from factory.adapters.diff import HostDiff, empty_diff
-from factory.adapters.exit import ERROR, ExitDecision, map_exit
+from factory.adapters.diff import HostDiff, empty_diff, split_factory_files
+from factory.adapters.exit import ABORT_SPEC_CONFLICT, ERROR, ExitDecision, map_exit
 from factory.adapters.harbor import build_harbor_command
 from factory.adapters.output import (
     TOKEN_FIELDS,
@@ -60,6 +60,7 @@ from factory.tasks.to_harbor import snapshot_head, to_harbor
 from factory.tasks.workdir import workdir_of
 from factory.verifier.verdict import (
     ERROR_INFRA,
+    REJECT,
     Verdict,
     sha256_label,
     validate_document,
@@ -859,6 +860,8 @@ def _execute_attempt(
         result = _read_json(trial / "result.json") if trial is not None else None
         stream, trajectory = _trial_artifacts(trial, run.arm.executor)
         patch = _read_bytes(trial / "verifier" / "diff.patch") if trial is not None else b""
+        patch, factory_files = split_factory_files(patch)
+        abort = _abort_document(factory_files)
         host_diff = _host_diff(patch)
 
         setup_failure = _setup_failure(result)
@@ -869,6 +872,7 @@ def _execute_attempt(
         else:
             decision = map_exit(
                 executor=run.arm.executor,
+                abort=abort,
                 result=result,
                 timed_out=timed_out,
                 stream=stream,
@@ -887,6 +891,7 @@ def _execute_attempt(
             resolved_model=_resolved_model(spend, command.model),
             image_digest=_image_digest(attempt.task),
             timing=_timing(started, ended),
+            abort=abort,
             agent_reported_usd=_agent_reported_usd(result),
             diff_uri=f"runs/{run.run_id}.diff",
         )
@@ -896,6 +901,15 @@ def _execute_attempt(
         diff_path.write_bytes(host_diff.patch)
         run_path = args.out / "runs" / f"{run.run_id}.json"
         write_run_document(run_document, run_path)
+
+        if decision.exit == ABORT_SPEC_CONFLICT:
+            _write_abort_verdict(
+                run,
+                args,
+                diff_sha=host_diff.sha256,
+                duration_s=_wall_seconds(started, ended),
+            )
+            return
 
         if trial is None or result is None or infra_failure is not None:
             _write_infra_verdict(
@@ -1045,19 +1059,55 @@ def _record_infra(
 def _write_infra_verdict(
     run: PlannedRun, args: argparse.Namespace, *, reason: str, diff_sha: str, duration_s: float
 ) -> None:
-    verdict = Verdict(
+    _store_run_verdict(
+        run,
+        args,
+        verdict=ERROR_INFRA,
+        reason=reason,
+        diff_sha=diff_sha,
+        duration_s=duration_s,
+    )
+
+
+def _write_abort_verdict(
+    run: PlannedRun, args: argparse.Namespace, *, diff_sha: str, duration_s: float
+) -> None:
+    """The abort is decided by the executor, not by running the candidate again."""
+    _store_run_verdict(
+        run,
+        args,
+        verdict=REJECT,
+        reason="executor aborted claiming a spec conflict",
+        diff_sha=diff_sha,
+        duration_s=duration_s,
+        category="abort_spec_conflict",
+    )
+
+
+def _store_run_verdict(
+    run: PlannedRun,
+    args: argparse.Namespace,
+    *,
+    verdict: str,
+    reason: str,
+    diff_sha: str,
+    duration_s: float,
+    category: str | None = None,
+) -> None:
+    document = Verdict(
         run_id=run.run_id,
         task_id=run.task_id,
         arm=run.arm.id,
         attempt=run.attempt,
         repetition=run.repetition,
-        verdict=ERROR_INFRA,
+        verdict=verdict,
         reason=reason[:1000],
         diff_sha=diff_sha,
         duration_s=duration_s,
+        category=category,
     )
     temp_dir = args.work / "verifier" / run.run_id
-    write_verdict(verdict, temp_dir)
+    write_verdict(document, temp_dir)
     _store_verdict(temp_dir / "verdict.json", args.out / "verdicts" / f"{run.run_id}.json")
     shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -1113,6 +1163,21 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return document if isinstance(document, dict) else None
+
+
+def _abort_document(factory_files: Mapping[str, bytes]) -> dict[str, Any] | None:
+    """The validated abort document the patch added, or ``None`` when absent or invalid."""
+    data = factory_files.get(".factory/abort.json")
+    if data is None:
+        return None
+    try:
+        document = json.loads(data.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        return None
+    try:
+        return validate_abort(document)
+    except InvalidAbort:
+        return None
 
 
 def _host_diff(patch: bytes) -> HostDiff:
