@@ -17,7 +17,7 @@ Prueba de corte de [ADR-0013](../../docs/adr/0013-verification-layer-over-agent-
 - Telemetría apagada con `ANONYMIZED_TELEMETRY=false` en la API y en los agentes [Cierto, `reference/telemetry.mdx`]. Sin túnel: solo lo crea `install.sh`.
 - El verificador no corre dentro del nodo `script`, que es un proceso en el contenedor de la API sin Docker [Cierto, `src/workflows/executors/script.ts`]. El nodo llama a `verifier_service.py` en el host a través del relé; el servicio saca el diff del directorio del worker contra el commit del snapshot y se lo pasa a `python -m factory.verifier`.
 
-## Cómo se ejecuta (en la torre, con la matriz parada)
+## Cómo se ejecuta (en una máquina sin otras cargas)
 
 ```bash
 cd ~/factory-f0/as-spike-src           # copia de este directorio
@@ -40,14 +40,14 @@ docker compose pull && docker compose up -d
 | 2 | Los workers pasan por el gateway con su virtual key | La key del worker aparece en `/spend/logs` del gateway con el modelo esperado; no hay otra credencial en el contenedor |
 | 3 | La red del worker solo alcanza el gateway | Desde el worker: el gateway y la API responden; `pypi.org`, `github.com`, `templates.agent-swarm.dev`, una IP pública, los puertos del host y `verifier-proxy` no |
 | 4 | El verificador corre aparte del worker | El veredicto sale del servicio del host; el worker no ve `store/hidden` ni el servicio |
-| 5 | Sin túnel y con la telemetría apagada | Ningún proceso de túnel, `ANONYMIZED_TELEMETRY=false` en la API y los agentes, y ninguna conexión de la API fuera de las redes internas durante la prueba (muestreo de `/proc/net/tcp` del contenedor cada 5 s; en la torre no hay `conntrack` sin sudo) |
+| 5 | Sin túnel y con la telemetría apagada | Ningún proceso de túnel, `ANONYMIZED_TELEMETRY=false` en la API y los agentes, y ninguna conexión de la API fuera de las redes internas durante la prueba (muestreo de `/proc/net/tcp` del contenedor cada 5 s; en la máquina del spike no había `conntrack` sin sudo) |
 
 Si fallan el 2 o el 3, la plataforma queda bloqueada para código `client-product`.
 
 ## Límites
 
 - La API descarga el catálogo de modelos de `models.dev` al arrancar y cada pocas horas, sin variable para apagarlo [Cierto, `src/be/pricing-refresh.ts`; visto en la primera prueba, cuando la API aún tenía salida]. Aquí no sale porque no tiene red con ruta. En una instalación con la API expuesta habría que cortarlo en el firewall.
-- El firewall de la torre descarta el tráfico de los contenedores hacia el host, de ahí el socket Unix en lugar de una IP del host.
+- El firewall de la máquina del spike descarta el tráfico de los contenedores hacia el host, de ahí el socket Unix en lugar de una IP del host.
 - El worker trabaja con la imagen de Agent Swarm, no con la de la tarea: no tiene las dependencias para ejecutar los tests del repo. Comparar su pass@1 con el de la matriz no es justo; para eso haría falta un worker por imagen de tarea (los *runtime pools* de Agent Swarm, sin probar).
 - `agent-fs` arranca con `EMBEDDING_PROVIDER=local` en una red sin salida. Si necesita bajarse un modelo al arrancar, fallará y habrá que darle salida o cambiar el proveedor.
 

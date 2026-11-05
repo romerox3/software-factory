@@ -1,6 +1,6 @@
 # Llevar el spike a una máquina compartida
 
-Qué cambia cuando el compose de este directorio pasa de la torre a una máquina del equipo con nginx y un certificado HTTPS. Los nombres de host, las claves y la URL de inferencia van en el `.env` de esa máquina, nunca aquí.
+Qué cambia cuando el compose de este directorio pasa de la máquina del spike a una del equipo con nginx y un certificado HTTPS. Los nombres de host, las claves y la URL de inferencia van en el `.env` de esa máquina, nunca aquí.
 
 ## Lo que se queda igual
 
@@ -14,7 +14,7 @@ Qué cambia cuando el compose de este directorio pasa de la torre a una máquina
 
 ## Lo que cambia
 
-| Pieza | En la torre (spike) | En la máquina compartida |
+| Pieza | En el spike | En la máquina compartida |
 |---|---|---|
 | Panel | Ninguno: la prueba iba por la API | Imagen `ghcr.io/desplega-ai/agent-swarm-ui` con la misma versión que la API, fijada por digest, detrás de nginx. No el panel alojado en `app.agent-swarm.dev`, que carga la analítica de Plausible [Cierto, `ui/index.mdx`] |
 | Acceso a la API | `127.0.0.1:3013` a través de `api-port` | nginx en HTTPS hacia `api-port`. En la API: `CORS_ALLOWED_ORIGINS`, `APP_URL` y `PUBLIC_MCP_BASE_URL` con el origen público |
@@ -22,7 +22,7 @@ Qué cambia cuando el compose de este directorio pasa de la torre a una máquina
 | Feedback del panel | No aplica | El botón de feedback envía a `proxy.desplega.sh` [Cierto, `apps/ui/src/api/hooks/use-feedback.ts`]. Hay que poner la config global `feedback_endpoint` en una URL local que no responda |
 | Modelo | El gateway de la factory, compatible con `/v1/messages` | La URL de inferencia del equipo. Claude Code necesita un endpoint compatible con la API de Anthropic. Si solo es compatible con OpenAI, el worker tiene que ser OpenCode o Codex, y entonces pesa la matriz: OpenCode quedó entre 0,15 y 0,23 de pass@1 por debajo de los otros tres brazos |
 | Verificador | Servicio en el host por socket Unix, con las tareas en `store/` | Igual, pero con su propio almacén de tareas. Para trabajo real, el diff sale del repo que toca el worker y no de un snapshot |
-| Egress | El firewall de la torre ya corta el tráfico de los contenedores al host | Con root se puede cerrar además con una regla en `DOCKER-USER` |
+| Egress | El firewall de la máquina del spike ya corta el tráfico de los contenedores al host | Con root se puede cerrar además con una regla en `DOCKER-USER` |
 
 ## nginx: dos orígenes
 
