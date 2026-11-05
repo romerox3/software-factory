@@ -1,6 +1,6 @@
 # ADR-0013 · La factory como capa de verificación y medición sobre Agent Swarm
 
-- **Estado**: aceptada, condicionada a la prueba de la sección «Decisión» · **Fecha**: 2026-11-04 · **Pausa**: la parte de orquestación de [ADR-0002](0002-orchestrator.md) y de las fases B y C de [07](../07-roadmap.md)
+- **Estado**: aceptada. La prueba de corte pasó los cinco criterios el 2026-11-04 ([spike 02](../../spikes/02-agent-swarm/README.md)) y el propietario lo confirmó el 2026-11-05 · **Fecha**: 2026-11-04 · **Descarta**: la parte de orquestación de [ADR-0002](0002-orchestrator.md) y de las fases B y C de [07](../07-roadmap.md)
 
 ## Contexto
 
@@ -46,6 +46,26 @@ Si fallan el 2 o el 3, la plataforma queda bloqueada para código de clase `clie
 - El harness de evals de Agent Swarm sirve para tareas públicas, no para código `client-product`, porque manda trayectorias a E2B, Turso y jueces de OpenRouter. Las tareas públicas de la fase A pueden convertirse a su formato de escenarios y proponerse upstream.
 - Se depende de un proyecto con un mantenedor humano principal y versiones casi diarias: la versión se fija por digest de imagen (regla 6 de `CLAUDE.md`) y cada cambio de versión pasa por M8.
 - Sigue abierto el hueco común: un ticket nuevo no trae tests ocultos. Resolverlo (fase B, B-03) es el trabajo de más valor de esta factory.
+
+## Resultado de la prueba (2026-11-04 y 2026-11-05)
+
+Los cinco criterios se cumplen ([spike 02](../../spikes/02-agent-swarm/README.md)). Para ello hubo que cambiar cuatro cosas de la configuración de serie:
+
+1. La API, sin ruta a internet.
+2. `CONTEXT_MODE_DISABLED` activado.
+3. Las tareas programadas, apagadas.
+4. El prompt base de la factory en el enunciado.
+
+El lead no siempre delega y se da por terminado antes que el worker, así que los cambios de código van por workflows con `agentId` fijado.
+
+Decisión del propietario (2026-11-05): la factory sigue como capa de verificación. El runner propio, la entrada, la UI y el publicador dejan de estar en pausa y quedan descartados. Lo que se construye es:
+
+- el verificador como servicio al que llama un nodo del workflow;
+- la política de datos y el fusible del gateway;
+- los tests ocultos para tickets nuevos (B-03);
+- la medición.
+
+Antes de invertir más en el verificador, se mide cuánto de lo que caza lo cazaría un juez LLM como los de las recetas de Agent Swarm ([spike 03](../../spikes/03-llm-judge/)).
 
 ## Cómo revertir
 

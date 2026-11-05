@@ -8,7 +8,7 @@ Qué cambia cuando el compose de este directorio pasa de la máquina del spike a
 - Las cuatro condiciones del resultado:
   1. La API sin ruta a internet.
   2. `CONTEXT_MODE_DISABLED=true`.
-  3. Las tareas programadas de serie desactivadas.
+  3. Las tareas programadas de serie desactivadas: `SEED_AUTOMATIONS_ENABLED=false` antes del primer arranque [Cierto, `guides/dreaming.mdx`]. `run_spike.sh` las apaga además, por si la base de datos ya existía.
   4. El enunciado envuelto en `prompts/base-v1.md`.
 - Una virtual key del gateway por agente, con `max_budget`, como pide la regla 2.
 

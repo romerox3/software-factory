@@ -109,6 +109,8 @@ services:
       SLACK_DISABLE: "true"
       GITHUB_DISABLE: "true"
       RUNTIME_POOLS_ENABLED: "false"
+      # Seed the default schedules and workflows (dreaming, daily reports) disabled.
+      SEED_AUTOMATIONS_ENABLED: "false"
     volumes:
       - swarm_api_data:/app/data
     secrets:
