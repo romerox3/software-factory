@@ -13,7 +13,14 @@ import pytest
 
 from factory.miner.runner import LocalRunner
 from factory.snapshot.fresh_init import build_snapshot
-from factory.tasks.canary import find_sites, make_canary, mutate_source, narrow_command
+from factory.tasks.canary import (
+    _mutate_regex,
+    _validate,
+    find_sites,
+    make_canary,
+    mutate_source,
+    narrow_command,
+)
 from factory.tasks.workdir import DEFAULT_WORKDIR
 from factory.verifier import DockerSandbox, verify
 from tests.verifier.support import ensure_image
@@ -206,6 +213,7 @@ def test_builds_a_canary_and_restores_the_test(tmp_path: Path) -> None:
     assert revalidation["valid"] is True
     assert revalidation["canary"]["checks"] == {"a": True, "b": True, "c": True}
     assert revalidation["canary"]["visible_ids"] == [result.test_id]
+    assert revalidation["canary"]["kind"] == "eq"
 
 
 def test_mutation_kinds() -> None:
@@ -239,6 +247,127 @@ def test_mutation_kinds() -> None:
         sites = find_sites(source, "t.py::test_x")
         assert len(sites) == 1, source
         assert mutate_source(source.encode(), sites[0]).decode() == expected
+
+
+def test_new_site_kinds() -> None:
+    cases = [
+        (
+            'def test_x():\n    assert "ab" in f()\n',
+            "def test_x():\n    assert 'abb' in f()\n",
+            "in",
+        ),
+        (
+            'def test_x():\n    self.assertIn(b"ab", f())\n',
+            "def test_x():\n    self.assertIn(b'abb', f())\n",
+            "in",
+        ),
+        (
+            "def test_x():\n    assert f() is True\n",
+            "def test_x():\n    assert f() is False\n",
+            "is_bool",
+        ),
+        (
+            'def test_x():\n    with pytest.raises(ValueError, match="boom"):\n        f()\n',
+            "def test_x():\n    with pytest.raises(ValueError, match='boomm'):\n        f()\n",
+            "raises_match",
+        ),
+        (
+            'def test_x():\n    pytest.raises(ValueError, match="boom")\n',
+            "def test_x():\n    pytest.raises(ValueError, match='boomm')\n",
+            "raises_match",
+        ),
+        (
+            'def test_x():\n    raises(ValueError, match="boom")\n',
+            "def test_x():\n    raises(ValueError, match='boomm')\n",
+            "raises_match",
+        ),
+        (
+            "def test_x():\n    expected = 3\n    assert f() == expected\n",
+            "def test_x():\n    expected = 4\n    assert f() == expected\n",
+            "local_const",
+        ),
+        (
+            'def test_x():\n    expected = "ab"\n    self.assertEqual(expected, f())\n',
+            "def test_x():\n    expected = 'abb'\n    self.assertEqual(expected, f())\n",
+            "local_const",
+        ),
+    ]
+    for source, expected, kind in cases:
+        sites = find_sites(source, "t.py::test_x")
+        assert len(sites) == 1, source
+        assert sites[0].kind == kind, source
+        assert mutate_source(source.encode(), sites[0]).decode() == expected, source
+
+
+def test_regex_mutation_rule() -> None:
+    assert _mutate_regex("boom") == "boomm"
+    assert _mutate_regex(r"\(boom\)") == r"\(boom\)x"
+    assert _mutate_regex(r"(a)\1") is None
+
+    source = 'def test_x():\n    with pytest.raises(ValueError, match=r"(a)\\1"):\n        f()\n'
+    assert find_sites(source, "t.py::test_x") == []
+
+
+def test_a_local_constant_assigned_twice_is_skipped() -> None:
+    source = "def test_x():\n    expected = 3\n    expected = 4\n    assert f() == expected\n"
+    assert find_sites(source, "t.py::test_x") == []
+
+
+def test_new_kinds_come_after_eq() -> None:
+    source = 'def test_x():\n    assert "a" in f()\n    assert f() == 1\n    assert g() is True\n'
+    assert [site.kind for site in find_sites(source, "t.py::test_x")] == [
+        "eq",
+        "in",
+        "is_bool",
+    ]
+
+
+class ErrorRunner:
+    """Runner that reports the ``b`` worktree as green and every other one as an error."""
+
+    def run(
+        self,
+        repo_dir: Path,
+        test_command: str,
+        junit_path: str,
+        timeout_sec: int,
+        *,
+        workdir: str = DEFAULT_WORKDIR,
+    ) -> dict[str, str]:
+        status = "passed" if Path(repo_dir).name == "b" else "error"
+        return {"tests/test_x.py::test_x": status}
+
+
+def test_only_a_failed_status_is_red_for_regex_and_local_sites(tmp_path: Path) -> None:
+    snapshot = tmp_path / "snapshot"
+    target = tmp_path / "target"
+    for root in (snapshot, target):
+        (root / "tests").mkdir(parents=True)
+        (root / "tests" / "test_x.py").write_text("def test_x():\n    pass\n", encoding="utf-8")
+    runner = ErrorRunner()
+
+    def validate(kind: str, name: str) -> bool:
+        return _validate(
+            runner,
+            snapshot=snapshot,
+            target=target,
+            relative="tests/test_x.py",
+            mutated=b"def test_x():\n    pass\n",
+            gold=b"",
+            test_command="pytest",
+            junit_path="junit.xml",
+            timeout_sec=1,
+            workdir=DEFAULT_WORKDIR,
+            visible_ids=["tests/test_x.py::test_x"],
+            work=tmp_path / name,
+            kind=kind,
+        )
+
+    assert validate("eq", "eq") is True
+    assert validate("in", "in") is True
+    assert validate("is_bool", "is_bool") is True
+    assert validate("raises_match", "raises_match") is False
+    assert validate("local_const", "local_const") is False
 
 
 def test_class_methods_and_nested_scopes() -> None:
@@ -327,6 +456,48 @@ def test_a_failed_check_tries_the_next_site(tmp_path: Path) -> None:
     lines = text.splitlines()
     assert lines[6].strip() == "assert round_half_up(2.5) == 4"
     assert lines[5].strip() == "assert round_half_up(2.5) == 3"
+
+
+NEW_KIND_SOURCES: list[tuple[str, str]] = [
+    ("in", 'def test_kind() -> None:\n    assert "ab" in "abc"\n'),
+    ("is_bool", "def test_kind() -> None:\n    assert (1 == 1) is True\n"),
+    (
+        "raises_match",
+        (
+            "import pytest\n\n\n"
+            "def test_kind() -> None:\n"
+            '    with pytest.raises(ValueError, match="boom"):\n'
+            '        raise ValueError("boom")\n'
+        ),
+    ),
+    (
+        "local_const",
+        (
+            "from calc import round_half_up\n\n\n"
+            "def test_kind() -> None:\n"
+            "    expected = 3\n"
+            "    assert round_half_up(2.5) == expected\n"
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize(("kind", "source"), NEW_KIND_SOURCES)
+def test_a_canary_records_the_new_site_kind(tmp_path: Path, kind: str, source: str) -> None:
+    store = build_store(
+        tmp_path,
+        test_patch=new_file_patch("tests/test_extra.py", source),
+        f2p=["tests/test_extra.py::test_kind"],
+        repro="tests/test_extra.py::test_kind",
+        test_paths="tests/test_extra.py",
+    )
+    out = tmp_path / "out"
+
+    result = make_canary(store, TASK_ID, out_store=out, runner=LocalRunner(), seed=1)
+
+    assert result.ok, result.reason
+    revalidation = read_json(out / "hidden" / str(result.canary_id) / "revalidation.json")
+    assert revalidation["canary"]["kind"] == kind
 
 
 def test_narrow_command_keeps_the_prefix_and_the_flags() -> None:

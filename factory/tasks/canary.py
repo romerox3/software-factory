@@ -21,7 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -33,8 +33,11 @@ from factory.verifier.taskstore import TaskError, load_task
 
 _MISSING = "missing"
 _FAILED = frozenset({"failed", "error"})
+_FAILED_ONLY = frozenset({"failed"})
+_STRICT_KINDS = frozenset({"raises_match", "local_const"})
 _VALUE_OPTIONS = frozenset({"-p", "-W", "-k", "-m", "-c", "-o", "--rootdir", "--deselect"})
 _CONSTANT_TYPES = (bool, int, float, str, bytes)
+_SCOPE_TYPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
 _PYTEST = re.compile(r"(?<![\w.-])pytest(?![\w.-])")
 
 
@@ -65,6 +68,7 @@ class Site:
     end_column: int
     old: str
     new: str
+    kind: str
 
 
 # --------------------------------------------------------------------------- mutation
@@ -89,8 +93,8 @@ def find_sites(source: str, node_id: str) -> list[Site]:
     if function is None:
         return []
     found: list[Site] = []
-    _walk(function, found)
-    return found
+    _walk(function, found, _local_constants(function))
+    return _order(found)
 
 
 def _find_function(
@@ -111,24 +115,76 @@ def _find_function(
     return None
 
 
-def _walk(node: ast.AST, found: list[Site]) -> None:
-    """Collect sites under ``node``, skipping nested scopes, then order them by source."""
+def _walk(node: ast.AST, found: list[Site], locals_: dict[str, ast.Constant]) -> None:
+    """Collect sites under ``node``, skipping nested scopes."""
     for child in ast.iter_child_nodes(node):
-        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+        if isinstance(child, _SCOPE_TYPES):
             continue
-        site = _site(child)
+        site = _site(child, locals_)
         if site is not None:
             found.append(site)
-        _walk(child, found)
-    found.sort(key=lambda site: (site.line, site.column))
+        _walk(child, found, locals_)
 
 
-def _site(node: ast.AST) -> Site | None:
+def _order(sites: Sequence[Site]) -> list[Site]:
+    """Deduplicate a site used twice and put the new kinds after the ``eq`` ones."""
+    unique: dict[tuple[int, int], Site] = {}
+    for site in sites:
+        unique.setdefault((site.line, site.column), site)
+    return sorted(unique.values(), key=lambda site: (site.kind != "eq", site.line, site.column))
+
+
+def _scoped_nodes(node: ast.AST) -> Iterator[ast.AST]:
+    """All nodes under ``node`` except those in a nested function or class."""
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, _SCOPE_TYPES):
+            continue
+        yield child
+        yield from _scoped_nodes(child)
+
+
+def _local_constants(function: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, ast.Constant]:
+    """Constants of names assigned exactly once with a plain single-name ``Assign``."""
+    counts: dict[str, int] = {}
+    for node in _scoped_nodes(function):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    counts[target.id] = counts.get(target.id, 0) + 1
+    constants: dict[str, ast.Constant] = {}
+    for node in _scoped_nodes(function):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            name = node.targets[0].id
+            constant = _constant(node.value)
+            if constant is not None and counts.get(name) == 1:
+                constants[name] = constant
+    return constants
+
+
+def _site(node: ast.AST, locals_: dict[str, ast.Constant]) -> Site | None:
     constant: ast.Constant | None = None
+    kind = "eq"
     if isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare):
         comparison = node.test
-        if len(comparison.ops) == 1 and isinstance(comparison.ops[0], ast.Eq):
-            constant = _constant(comparison.comparators[0]) or _constant(comparison.left)
+        if len(comparison.ops) == 1:
+            operator = comparison.ops[0]
+            if isinstance(operator, ast.Eq):
+                constant = _constant(comparison.comparators[0]) or _constant(comparison.left)
+                if constant is None:
+                    constant = _local(comparison.comparators[0], locals_) or _local(
+                        comparison.left, locals_
+                    )
+                    kind = "local_const"
+            elif isinstance(operator, ast.In):
+                constant = _typed(comparison.left, (str, bytes))
+                kind = "in"
+            elif isinstance(operator, ast.Is):
+                constant = _typed(comparison.comparators[0], (bool,))
+                kind = "is_bool"
     elif isinstance(node, ast.Call):
         attribute = node.func
         if (
@@ -137,7 +193,32 @@ def _site(node: ast.AST) -> Site | None:
             and len(node.args) == 2
         ):
             constant = _constant(node.args[1]) or _constant(node.args[0])
-    if constant is None or constant.end_lineno is None or constant.end_col_offset is None:
+            if constant is None:
+                constant = _local(node.args[1], locals_) or _local(node.args[0], locals_)
+                kind = "local_const"
+        elif (
+            isinstance(attribute, ast.Attribute)
+            and attribute.attr == "assertIn"
+            and len(node.args) == 2
+        ):
+            constant = _typed(node.args[0], (str, bytes))
+            kind = "in"
+        else:
+            match = _raises_match(node)
+            if match is None:
+                return None
+            mutated = _mutate_regex(str(match.value))
+            if mutated is None:
+                return None
+            return _make_site(match, "raises_match", mutated)
+    if constant is None:
+        return None
+    new = not constant.value if kind == "is_bool" else _mutate_value(constant.value)
+    return _make_site(constant, kind, new)
+
+
+def _make_site(constant: ast.Constant, kind: str, new: Any) -> Site | None:
+    if constant.end_lineno is None or constant.end_col_offset is None:
         return None
     return Site(
         line=constant.lineno,
@@ -145,13 +226,54 @@ def _site(node: ast.AST) -> Site | None:
         end_line=constant.end_lineno,
         end_column=constant.end_col_offset,
         old=repr(constant.value),
-        new=repr(_mutate_value(constant.value)),
+        new=repr(new),
+        kind=kind,
     )
+
+
+def _raises_match(node: ast.Call) -> ast.Constant | None:
+    """The ``match`` string constant of a ``pytest.raises`` / ``raises`` call."""
+    function = node.func
+    named = (isinstance(function, ast.Name) and function.id == "raises") or (
+        isinstance(function, ast.Attribute)
+        and function.attr == "raises"
+        and isinstance(function.value, ast.Name)
+        and function.value.id == "pytest"
+    )
+    if not named:
+        return None
+    for keyword in node.keywords:
+        if keyword.arg == "match":
+            return _typed(keyword.value, (str,))
+    return None
+
+
+def _mutate_regex(pattern: str) -> str | None:
+    """Change a matching regex, or ``None`` when the changed pattern does not compile."""
+    tail = pattern[-1:]
+    mutated = pattern + (tail if tail.isalnum() else "x")
+    try:
+        re.compile(mutated)
+    except re.error:
+        return None
+    return mutated
 
 
 def _constant(node: ast.AST) -> ast.Constant | None:
     if isinstance(node, ast.Constant) and type(node.value) in _CONSTANT_TYPES:
         return node
+    return None
+
+
+def _typed(node: ast.AST, types: tuple[type, ...]) -> ast.Constant | None:
+    if isinstance(node, ast.Constant) and type(node.value) in types:
+        return node
+    return None
+
+
+def _local(node: ast.AST, locals_: dict[str, ast.Constant]) -> ast.Constant | None:
+    if isinstance(node, ast.Name):
+        return locals_.get(node.id)
     return None
 
 
@@ -308,6 +430,7 @@ def make_canary(
                         workdir=workdir,
                         visible_ids=visible_ids,
                         work=work / f"attempt-{attempts}",
+                        kind=site.kind,
                     )
                 except RunnerError:
                     last_reason = "runner_error"
@@ -377,13 +500,18 @@ def _validate(
     workdir: str,
     visible_ids: list[str],
     work: Path,
+    kind: str,
 ) -> bool:
     """Run checks (a), (b) and (c) of docs/05 §7 for one mutated test.
 
     (a) canary base + gold + the mutated test is red;
     (b) the target tree + gold is green;
     (c) the canary base alone is red.
+
+    A regex or local-constant mutation is only trusted when it fails, not when it
+    errors: an error can come from a broken mutation instead of the contradiction.
     """
+    red = _FAILED_ONLY if kind in _STRICT_KINDS else _FAILED
     work.mkdir(parents=True)
     base_tree = work / "base"
     _copy_tree(snapshot, base_tree)
@@ -397,7 +525,7 @@ def _validate(
     if not _apply_patch(mutated, gold, work / "gold.patch"):
         return False
     if not _all_in(
-        _run(runner, mutated, test_command, junit_path, timeout_sec, workdir), visible_ids, _FAILED
+        _run(runner, mutated, test_command, junit_path, timeout_sec, workdir), visible_ids, red
     ):
         return False
 
@@ -415,9 +543,7 @@ def _validate(
 
     # (c) the base implementation must fail the mutated assertion too.
     return _all_in(
-        _run(runner, base_tree, test_command, junit_path, timeout_sec, workdir),
-        visible_ids,
-        _FAILED,
+        _run(runner, base_tree, test_command, junit_path, timeout_sec, workdir), visible_ids, red
     )
 
 
@@ -529,6 +655,7 @@ def _write_canary(
             "line": site.line,
             "old": site.old,
             "new": site.new,
+            "kind": site.kind,
             "checks": {"a": True, "b": True, "c": True},
         },
     }
