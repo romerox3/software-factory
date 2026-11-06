@@ -86,6 +86,6 @@ Además, la auditoría descartó seis tareas mal construidas, en las que el enun
 3. **La baseline de M4 se calibra en el repo del piloto al empezar la fase C** ([01](../docs/01-metrics.md) M4), porque la precisión del SZZ básico cambia mucho de un repo a otro.
 
 **Lo que queda abierto de la fase A:**
-- A4 y A5, con el modelo local, sin medir.
-- M5 (canarias): no se ha medido en esta matriz.
+- A4 y A5, con el modelo local, sin medir. El propietario los descartó el 2026-11-06: el modelo para datos del cliente vendrá del gateway del CPD en la fase C ([07](../docs/07-roadmap.md)).
+- M5 (canarias): no se ha medido en esta matriz. Pasa a ser la primera tarea de la fase B.
 - El residual T29 del verificador, aceptado en F0 ([08](../docs/08-risks.md)).
