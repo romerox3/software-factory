@@ -48,6 +48,7 @@
 - **Objetivo**: la cota superior del IC 95 % de la factory ≤ la estimación puntual humana.
 - **Estadística**: con 0 regresiones en n cambios, la cota superior al 95 % es ≈ 3/n (regla del tres) [Cierto]. Para afirmar una tasa < 2 % hacen falta ~150 cambios fusionados sin regresiones. Para eventos > 0 se usa el intervalo exacto de Clopper-Pearson.
 - **Sesgo conocido**: SZZ tiene falsos positivos con refactors y commits grandes [Probable]. Se audita a mano una muestra de 10 atribuciones por trimestre.
+- **Prueba sobre repos públicos (2026-11-06)**: con el SZZ básico de `factory/metrics/szz.py`, en 12 meses de loguru 3 de las 4 atribuciones eran falsas: un changelog, documentación y un ajuste de CI [Cierto]. Desde entonces, la atribución solo usa ficheros de código fuente. Con ese filtro, en loguru queda 1 de 65 (la plausible) y en scrapy salen 52 de 343. Muchas de las de scrapy vienen de commits cuyo cuerpo (viñetas de un squash merge) dice «fix». Buscando el regex solo en el asunto, scrapy baja a 26, pero loguru pierde su única atribución buena [Cierto, n = 2 repos]. Conclusión: el selector de commits de fix depende de cómo escribe cada repo sus mensajes. **Antes de fijar la baseline de un repo, se calibra en ese repo**: se auditan a mano unas 20 atribuciones, se elige el selector (asunto, mensaje completo o etiqueta `bug` del issue) y se mide la precisión. La baseline lleva esa precisión.
 
 ### M5 · Tasa de trampa en canarias
 
@@ -75,7 +76,7 @@ Responde a la tesis de HumanLayer: «maintainability has no fast oracle» ([wsff
 | Submétrica | Fórmula | Herramienta (licencia verificada el 2026-10-31) | Cuándo |
 |---|---|---|---|
 | M7a · Δ complejidad | Δ de complejidad ciclomática media y máxima por función de las funciones tocadas, y Δ NLOC; diff frente a la base | [lizard](https://github.com/terryyin/lizard) (MIT) [Cierto] | F0 en adelante, por ejecución |
-| M7b · Δ duplicación | Bloques duplicados nuevos introducidos por el diff | [jscpd](https://github.com/kucherenko/jscpd) (MIT) [Cierto] | F0 en adelante |
+| M7b · Δ duplicación | Bloques duplicados nuevos introducidos por el diff, entre los ficheros de código que toca | Extensión `lizardduplicate` de [lizard](https://github.com/terryyin/lizard) (MIT) [Cierto]. Se usa en lugar de jscpd para no depender de Node (2026-11-06) | F0 en adelante |
 | M7c · Tamaño frente al gold | `líneas cambiadas del candidato / líneas cambiadas del gold`, más la Δ complejidad candidato − gold | git + lizard | Solo F0 (las tareas minadas tienen gold) |
 | M7d · Supervivencia | Fracción de líneas introducidas por la factory que siguen sin tocar a 30 y 90 días (`git blame`), frente a las líneas humanas del mismo periodo y ficheros | PyDriller | Desde F1 |
 | M7e · Retrabajo | Fracción de líneas de la factory modificadas o borradas por otro commit en ≤ 30 días (churn temprano) | PyDriller | Desde F1 |
