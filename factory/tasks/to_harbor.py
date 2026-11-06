@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import tempfile
 from collections.abc import Sequence
@@ -91,6 +93,37 @@ def to_harbor(
         shutil.rmtree(staging, ignore_errors=True)
         raise
     return target
+
+
+def tree_digest(path: Path) -> str:
+    """Deterministic digest of a converted task tree.
+
+    Covers relative posix paths, file bytes and executable bits, and symlink
+    targets; timestamps are ignored so a fresh conversion with the same output
+    compares equal to the one on disk.
+    """
+    root = Path(path)
+    entries = sorted(
+        ((entry.relative_to(root).as_posix(), entry) for entry in root.rglob("*")),
+        key=lambda item: item[0],
+    )
+    digest = hashlib.sha256()
+    for relative, entry in entries:
+        if entry.is_symlink():
+            kind, payload = b"l", os.readlink(entry).encode("utf-8", errors="surrogateescape")
+        elif entry.is_dir():
+            kind, payload = b"d", b""
+        elif entry.is_file():
+            executable = bool(entry.stat().st_mode & stat.S_IXUSR)
+            kind, payload = (b"x" if executable else b"f"), entry.read_bytes()
+        else:
+            raise ValueError(f"unsupported entry in task tree: {entry}")
+        digest.update(kind)
+        digest.update(relative.encode("utf-8", errors="surrogateescape"))
+        digest.update(b"\0")
+        digest.update(payload)
+        digest.update(b"\0")
+    return "sha256:" + digest.hexdigest()
 
 
 def _load_task(task_path: Path) -> dict[str, Any]:

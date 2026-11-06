@@ -56,7 +56,7 @@ from factory.adapters.output import (
 from factory.adapters.prompt import prompt_sha
 from factory.gateway.client import FactoryKeysClient
 from factory.normalize import normalize_text
-from factory.tasks.to_harbor import snapshot_head, to_harbor
+from factory.tasks.to_harbor import snapshot_head, to_harbor, tree_digest
 from factory.tasks.workdir import workdir_of
 from factory.verifier.verdict import (
     ERROR_INFRA,
@@ -1541,18 +1541,35 @@ def _convert_tasks(
         for task_id in task_ids:
             key = (executor, wall_s, task_id)
             target = _harbor_task_dir(args.work, executor, wall_s, task_id)
+            staging: Path | None = None
             try:
-                if not (target.is_dir() and any(target.iterdir())):
-                    deps.to_harbor(
-                        args.store / "visible" / task_id,
-                        target.parent,
-                        executor=executor,
-                        allowed_hosts=hosts,
-                        agent_timeout_sec=wall_s,
-                    )
+                target.parent.mkdir(parents=True, exist_ok=True)
+                staging = Path(tempfile.mkdtemp(dir=target.parent, prefix=f".{task_id}."))
+                fresh = deps.to_harbor(
+                    args.store / "visible" / task_id,
+                    staging,
+                    executor=executor,
+                    allowed_hosts=hosts,
+                    agent_timeout_sec=wall_s,
+                )
+                if (
+                    target.is_dir()
+                    and not target.is_symlink()
+                    and tree_digest(target) == tree_digest(fresh)
+                ):
+                    converted[key] = target
+                    continue
+                if target.is_dir() and not target.is_symlink():
+                    shutil.rmtree(target)
+                elif target.exists() or target.is_symlink():
+                    target.unlink()
+                os.replace(fresh, target)
                 converted[key] = target
             except Exception as exc:  # noqa: BLE001 - one bad task must not abort the matrix
                 errors[key] = f"{type(exc).__name__}: {exc}"
+            finally:
+                if staging is not None:
+                    shutil.rmtree(staging, ignore_errors=True)
     return converted, errors
 
 

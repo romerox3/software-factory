@@ -823,7 +823,7 @@ def test_tasks_are_converted_once_per_executor_with_the_gateway_host(tmp_path: P
 
     assert code == 0
     assert sorted(
-        (out_dir.relative_to(work).as_posix(), kwargs["executor"], kwargs["allowed_hosts"])
+        (out_dir.parent.relative_to(work).as_posix(), kwargs["executor"], kwargs["allowed_hosts"])
         for _visible, out_dir, kwargs in converter.calls
     ) == [
         ("harbor/claude-code-t1800", "claude-code", ("gateway.example",)),
