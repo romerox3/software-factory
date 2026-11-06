@@ -63,7 +63,7 @@ Cinco tareas, dos repeticiones, un worker de Claude Code con `factory/glm-5.3-fl
 | narwhals-3480 | 0/2: una supera el tope, otra `reject` por `dg.skip-marker` | 3/5 |
 | markdown-1587 | 0/2: las dos superan el tope | 2/5 |
 
-Las tres tareas de control salen 6/6, así que la plataforma no estropea al worker [Cierto]. Las dos difíciles no se pueden comparar: la matriz daba a A6 30 min y 60 turnos, y aquí el tope era de 25 min sin límite de turnos.
+Las tres tareas de control salen 6/6, pero solo 2 de esas ejecuciones son independientes [Cierto, revisión de la base de datos del swarm del 2026-11-06]. Antes de cada tarea, Agent Swarm inyecta los recuerdos parecidos (`memory_retrieval`, intención «pre-task memory recall») y al terminar guarda un resumen de lo hecho, con el enfoque de la solución. La segunda repetición de cada tarea recibió el resumen de la primera; en jsonpickle-588 el agente pidió además el enfoque «del r1» y su diff se parece en un 88 % al de la primera. La primera de psd-tools-551 también recibió el recuerdo de una ejecución anterior de la puesta a punto. Quedan como independientes las primeras de loguru-1451 y jsonpickle-588, y las dos se aceptan: la plataforma no estropea al worker [Probable, n = 2]. Además, todas las ejecuciones compartían el volumen de `/workspace/tasks`, así que una repetición podía ver el repositorio de otra. Para medir con Agent Swarm hay que dar a cada ejecución una base de datos y un volumen propios, o apagar la memoria. Las dos difíciles no se pueden comparar: la matriz daba a A6 30 min y 60 turnos, y aquí el tope era de 25 min sin límite de turnos.
 
 | # | Criterio | Resultado |
 |---|---|---|
