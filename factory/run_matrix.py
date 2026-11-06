@@ -44,7 +44,7 @@ import jsonschema
 from factory.adapters.abort import InvalidAbort, abort_path_for, validate_abort
 from factory.adapters.config import GATEWAY_BASE_URL, AgentConfig, agent_config
 from factory.adapters.diff import HostDiff, empty_diff, split_factory_files
-from factory.adapters.exit import ABORT_SPEC_CONFLICT, ERROR, ExitDecision, map_exit
+from factory.adapters.exit import ERROR, ExitDecision, map_exit
 from factory.adapters.harbor import build_harbor_command
 from factory.adapters.output import (
     TOKEN_FIELDS,
@@ -60,7 +60,6 @@ from factory.tasks.to_harbor import snapshot_head, to_harbor, tree_digest
 from factory.tasks.workdir import workdir_of
 from factory.verifier.verdict import (
     ERROR_INFRA,
-    REJECT,
     Verdict,
     sha256_label,
     validate_document,
@@ -902,15 +901,6 @@ def _execute_attempt(
         run_path = args.out / "runs" / f"{run.run_id}.json"
         write_run_document(run_document, run_path)
 
-        if decision.exit == ABORT_SPEC_CONFLICT:
-            _write_abort_verdict(
-                run,
-                args,
-                diff_sha=host_diff.sha256,
-                duration_s=_wall_seconds(started, ended),
-            )
-            return
-
         if trial is None or result is None or infra_failure is not None:
             _write_infra_verdict(
                 run,
@@ -1066,21 +1056,6 @@ def _write_infra_verdict(
         reason=reason,
         diff_sha=diff_sha,
         duration_s=duration_s,
-    )
-
-
-def _write_abort_verdict(
-    run: PlannedRun, args: argparse.Namespace, *, diff_sha: str, duration_s: float
-) -> None:
-    """The abort is decided by the executor, not by running the candidate again."""
-    _store_run_verdict(
-        run,
-        args,
-        verdict=REJECT,
-        reason="executor aborted claiming a spec conflict",
-        diff_sha=diff_sha,
-        duration_s=duration_s,
-        category="abort_spec_conflict",
     )
 
 

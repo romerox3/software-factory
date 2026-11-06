@@ -48,6 +48,8 @@ def test_joins_runs_with_verdicts_by_run_id() -> None:
     )
     assert record.cost_usd == pytest.approx(0.20)
     assert record.verify_cost_usd == pytest.approx(0.01)
+    assert record.category is None
+    assert record.canary is False
     assert record.diff_text is not None
 
 

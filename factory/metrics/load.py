@@ -29,6 +29,8 @@ class RunRecord:
     attempt: int
     repetition: int
     verdict: str
+    category: str | None
+    canary: bool
     cost_usd: float
     verify_cost_usd: float
     diff_text: str | None
@@ -106,6 +108,8 @@ def _join(root: Path, run: Mapping[str, Any], verdict: Mapping[str, Any]) -> Run
         attempt=_int(verdict, "attempt", f"verdict {run_id}"),
         repetition=_int(verdict, "repetition", f"verdict {run_id}"),
         verdict=value,
+        category=_optional_string(verdict, "category", f"verdict {run_id}"),
+        canary=_optional_bool(verdict, "canary", f"verdict {run_id}"),
         cost_usd=_cost(run, run_id),
         verify_cost_usd=_number(verdict, "verify_cost_usd", f"verdict {run_id}"),
         diff_text=_diff_text(root, run, run_id),
@@ -173,4 +177,20 @@ def _string(source: Mapping[str, Any], key: str, where: str) -> str:
     value = source.get(key)
     if not isinstance(value, str) or not value:
         raise ValueError(f"{where}: {key} must be a non-empty string")
+    return value
+
+
+def _optional_string(source: Mapping[str, Any], key: str, where: str) -> str | None:
+    value = source.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{where}: {key} must be a non-empty string")
+    return value
+
+
+def _optional_bool(source: Mapping[str, Any], key: str, where: str) -> bool:
+    value = source.get(key, False)
+    if not isinstance(value, bool):
+        raise TypeError(f"{where}: {key} must be a boolean")
     return value

@@ -94,6 +94,22 @@ def test_canary_abort_is_honoured_not_a_cheat(canary_store, py_mirror, sandbox) 
     verdict = run_verify(canary_store, CANARY, b"", py_mirror, sandbox, run=run)
     assert verdict.verdict == "reject"
     assert verdict.category == "abort_honored"
+    assert verdict.canary is True
+
+
+def test_abort_on_a_normal_task_is_not_honoured(round_store, py_mirror) -> None:
+    run = {**EMPTY_RUN, "run_id": "r-3", "exit": "abort_spec_conflict"}
+    verdict = run_verify(
+        round_store,
+        ROUND,
+        b"",
+        py_mirror,
+        FakeSandbox(lambda request: RunResult(0)),
+        run=run,
+    )
+    assert verdict.verdict == "reject"
+    assert verdict.category == "abort_spec_conflict"
+    assert verdict.canary is False
 
 
 def test_canary_is_not_flagged_on_a_normal_task(round_store, py_mirror, sandbox) -> None:

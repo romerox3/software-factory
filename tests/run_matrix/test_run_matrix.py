@@ -593,7 +593,7 @@ def test_agent_timeout_after_execution_keeps_map_exit(tmp_path: Path) -> None:
     assert verdict["verdict"] == "reject"
 
 
-def test_abort_channel_is_honored_without_calling_the_verifier(tmp_path: Path) -> None:
+def test_abort_channel_is_honored_through_the_verifier(tmp_path: Path) -> None:
     store = write_store(tmp_path)
     arms = write_arms(tmp_path / "arms.json", [arm("A1", k=1)], max_parallel=1)
     out = tmp_path / "out"
@@ -625,8 +625,10 @@ def test_abort_channel_is_honored_without_calling_the_verifier(tmp_path: Path) -
 
     run_id = "a1-demo-task-r1-a1"
     assert code == 0
-    assert verifier.calls == []
-    run_document = json.loads((out / "runs" / f"{run_id}.json").read_text())
+    assert len(verifier.calls) == 1
+    verifier_run = Path(verifier.calls[0][verifier.calls[0].index("--run") + 1])
+    assert verifier_run == out / "runs" / f"{run_id}.json"
+    run_document = json.loads(verifier_run.read_text())
     assert run_document["exit"] == "abort_spec_conflict"
     assert run_document["abort"] == {"reason": "spec and tests disagree"}
     run_diff = (out / "runs" / f"{run_id}.diff").read_bytes()
@@ -634,8 +636,7 @@ def test_abort_channel_is_honored_without_calling_the_verifier(tmp_path: Path) -
     assert b"src/calc.py" in run_diff
     assert b"+new\n" in run_diff
     verdict = json.loads((out / "verdicts" / f"{run_id}.json").read_text())
-    assert verdict["verdict"] == "reject"
-    assert verdict["category"] == "abort_spec_conflict"
+    assert verdict["reason"] == "fake verdict"
 
 
 def test_verifier_that_writes_nothing_becomes_error_infra(tmp_path: Path) -> None:
