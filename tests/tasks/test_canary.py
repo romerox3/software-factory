@@ -92,6 +92,7 @@ def build_store(
     repro: str | None = None,
     absolute: bool = False,
     test_paths: str = "tests/test_calc.py",
+    hidden_command: str | None = None,
 ) -> Path:
     store = tmp_path / "store"
     shutil.copytree(ROUND_TASK, store)
@@ -120,16 +121,22 @@ def build_store(
         (hidden / "test.patch").write_text(test_patch, encoding="utf-8")
     if f2p is not None:
         (hidden / "f2p.json").write_text(json.dumps(f2p), encoding="utf-8")
-    command = (
-        f"python -m pytest -q {test_paths} --junitxml="
-        f"{'/logs/verifier/junit.xml' if absolute else 'junit.xml'} -p no:cacheprovider"
+    junit = "/logs/verifier/junit.xml" if absolute else "junit.xml"
+    if hidden_command is None:
+        hidden_command = (
+            "export PATH=/opt/conda/envs/testbed/bin:$PATH && "
+            f"pytest --no-header -rA --tb=line --color=no -p no:cacheprovider "
+            f"{test_paths} --junitxml={junit}"
+        )
+    visible_command = (
+        f"pytest --no-header -rA --tb=line --color=no -p no:cacheprovider {test_paths}"
     )
     verifier = read_json(hidden / "verifier.json")
-    verifier["test_command"] = command
-    verifier["junit_path"] = "/logs/verifier/junit.xml" if absolute else "junit.xml"
+    verifier["test_command"] = hidden_command
+    verifier["junit_path"] = junit
     (hidden / "verifier.json").write_text(json.dumps(verifier), encoding="utf-8")
     task = read_json(visible / "factory.task.json")
-    task["visible_tests"]["command"] = command
+    task["visible_tests"]["command"] = visible_command
     (visible / "factory.task.json").write_text(json.dumps(task), encoding="utf-8")
     (hidden / "revalidation.json").write_text(
         json.dumps(
@@ -176,6 +183,14 @@ def test_builds_a_canary_and_restores_the_test(tmp_path: Path) -> None:
     assert verifier["canary"] is True
     assert verifier["task_id"] == canary_id
     assert "tests/test_calc.py" in verifier["diff_guard"]["forbidden_globs"]
+
+    hidden_command = read_json(store / "hidden" / TASK_ID / "verifier.json")["test_command"]
+    source_visible = read_json(store / "visible" / TASK_ID / "factory.task.json")
+    assert "--junitxml=" not in source_visible["visible_tests"]["command"]
+    document = read_json(visible / "factory.task.json")
+    assert document["visible_tests"]["command"] == narrow_command(
+        hidden_command, str(result.test_id)
+    )
 
     proposal = (visible / "openspec" / "changes" / canary_id / "proposal.md").read_text(
         encoding="utf-8"
@@ -256,6 +271,31 @@ def test_a_test_without_constants_is_skipped(tmp_path: Path) -> None:
 
     assert result.ok is False
     assert result.reason == "no_mutation_site"
+    assert not (out / "visible").exists()
+    assert not (out / "hidden").exists()
+
+
+class RecordingRunner:
+    """Runner that fails the test if it is called."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def run(self, *args: Any, **kwargs: Any) -> dict[str, str]:
+        self.calls += 1
+        raise AssertionError("the runner must not be called")
+
+
+def test_an_un_narrowable_command_skips_the_task(tmp_path: Path) -> None:
+    store = build_store(tmp_path, hidden_command="python -m unittest discover")
+    out = tmp_path / "out"
+    runner = RecordingRunner()
+
+    result = make_canary(store, TASK_ID, out_store=out, runner=runner, seed=1)
+
+    assert result.ok is False
+    assert result.reason == "command_not_narrowable"
+    assert runner.calls == 0
     assert not (out / "visible").exists()
     assert not (out / "hidden").exists()
 

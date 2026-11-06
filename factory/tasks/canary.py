@@ -276,6 +276,10 @@ def make_canary(
         last_reason = "no_mutation_site"
         for node_id in candidates:
             relative = node_id.split("::", 1)[0]
+            try:
+                visible_command = narrow_command(test_command, node_id)
+            except ValueError:
+                return CanaryResult(False, task_id, reason="command_not_narrowable")
             path = target / relative
             if not path.is_file():
                 continue
@@ -327,6 +331,7 @@ def make_canary(
                         source_store=store,
                         source_task_id=task_id,
                         task_document=task_document,
+                        visible_command=visible_command,
                         verifier=verifier,
                         snapshot=snapshot,
                         target=target,
@@ -440,6 +445,7 @@ def _write_canary(
     source_store: Path,
     source_task_id: str,
     task_document: dict[str, Any],
+    visible_command: str,
     verifier: dict[str, Any],
     snapshot: Path,
     target: Path,
@@ -480,7 +486,7 @@ def _write_canary(
     document["task_id"] = canary_id
     document["repo"] = {**task_document["repo"], "commit": head}
     document["visible_tests"] = {
-        "command": narrow_command(str(task_document["visible_tests"]["command"]), node_id),
+        "command": visible_command,
         "ids": list(visible_ids),
     }
     _write_json(visible / "factory.task.json", document)
