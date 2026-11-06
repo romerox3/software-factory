@@ -2,7 +2,7 @@
 
 > **Resumen.** Sobre 33 tareas públicas de SWE-rebench (`tasks/public-v2.manifest.json`) y 594 ejecuciones, los cuatro brazos medidos producen salidas de contrato válidas en el 100 % de los casos, y el verificador pasa la auditoría: 1 falso `accept` de 30 y 10 de 10 rechazos concordantes. pass@1: Claude Code × Sonnet 87,9 %, Claude Code × GLM 83,8 %, Codex × GLM 78,8 % y OpenCode × GLM 65,7 %. Solo OpenCode queda claramente por debajo de la referencia. Se cumplen todos los criterios de salida de la fase A y no salta ningún criterio de abandono. La recomendación es pasar a la fase B, con tres condiciones que se explican en §6.
 
-Fecha: 2026-11-06. Fuente de las cifras: `factory.metrics.report` sobre el conjunto `public-v2`, con los veredictos del verificador 0.2.0. Las trayectorias y los veredictos están en el almacén privado, no en este repo.
+Fecha: 2026-11-06. Fuente de las cifras: `factory.metrics.report` sobre el conjunto `public-v2`. De los 594 veredictos, 576 son del verificador 0.1.0 y 18 (toqito-1484) del 0.2.0. La M8 mostró que los dos dan el mismo veredicto fuera de esa tarea (58 de 58 en la muestra de control). Las trayectorias y los veredictos están en el almacén privado, no en este repo.
 
 ## 1. Criterios de salida y de abandono
 
@@ -81,7 +81,7 @@ Además, la auditoría descartó seis tareas mal construidas, en las que el enun
 
 **Recomendación: pasar a la fase B.** El núcleo mide de forma reproducible y el verificador tiene la tasa de falsos `accept` dentro del criterio. Condiciones:
 
-1. **Ejecutor por defecto: Claude Code**, con GLM para el volumen y Sonnet como referencia. OpenCode no, mientras no se entienda por qué deja diffs vacíos. Es coherente con [ADR-0013](../docs/adr/0013-verification-layer-over-agent-swarm.md), donde el worker de Agent Swarm ya es Claude Code × GLM.
+1. **Ejecutor por defecto: Claude Code**, con GLM para el volumen y Sonnet como referencia. OpenCode no, mientras no se entienda por qué deja diffs vacíos. Es coherente con [ADR-0013](../docs/adr/0013-verification-layer-over-agent-swarm.md), donde el worker de Agent Swarm ya es Claude Code × GLM. El precio: A6 es el único brazo por encima del objetivo de tamaño (M7c = 1,89 frente a ≤ 1,5). Lo acepto en la fase B porque M7a y M7b no empeoran, pero M7c de A6 se vigila. Si en las apps de la fase B sigue por encima de 1,5, se prueba Sonnet o un prompt que pida cambios mínimos.
 2. **La puerta sigue siendo el verificador con tests ocultos.** Un juez LLM solo sirve como filtro previo ([spike 03](../spikes/03-llm-judge/README.md)).
 3. **La baseline de M4 se calibra en el repo del piloto al empezar la fase C** ([01](../docs/01-metrics.md) M4), porque la precisión del SZZ básico cambia mucho de un repo a otro.
 
