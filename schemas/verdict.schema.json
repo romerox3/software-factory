@@ -130,7 +130,11 @@
       "additionalProperties": false,
       "properties": {
         "mutation": { "type": "object" },
-        "sast": { "type": "object" }
+        "sast": { "type": "object" },
+        "superseded_by_hidden": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     }
   },

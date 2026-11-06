@@ -29,7 +29,7 @@ from typing import Any
 from factory.junit import MAX_REPORT_BYTES, parse_junit
 from factory.tasks.workdir import DEFAULT_WORKDIR, workdir_of
 from factory.testids import pytest_node_id
-from factory.verifier import diffguard, gitops, sast, stream
+from factory.verifier import diffguard, gitops, sast, stream, testpatch
 from factory.verifier.gitops import InfraError, PatchError
 from factory.verifier.sandbox import LOGS_MOUNT, RunRequest, RunResult, Sandbox, SandboxError
 from factory.verifier.taskstore import Task, TaskError, load_task
@@ -349,6 +349,7 @@ def _analyse_diff(state: _State, task: Task, base_dir: Path, candidate: Path) ->
     before any code of the candidate runs.
     """
     shutil.copytree(base_dir, candidate, symlinks=True)
+    state.informative["superseded_by_hidden"] = []
     if not state.diff.strip():
         state.hard["patch_valid"] = True
         state.hard["diff_guard"] = []
@@ -364,6 +365,7 @@ def _analyse_diff(state: _State, task: Task, base_dir: Path, candidate: Path) ->
         changes = gitops.list_changes(candidate, state.home)
     except (PatchError, UnicodeError, ValueError) as exc:
         raise invalid(f"git cannot apply the diff: {str(exc)[:100]}") from exc
+    changes = _supersede_hidden_new_files(state, task, candidate, changes)
     changed_lines = sum(change.added + change.deleted for change in changes)
     cap = task.patch_line_cap
     if changed_lines > cap:
@@ -409,6 +411,35 @@ def _analyse_diff(state: _State, task: Task, base_dir: Path, candidate: Path) ->
             feedback=[feedback_hidden()],
         )
     return changes
+
+
+def _supersede_hidden_new_files(
+    state: _State, task: Task, candidate: Path, changes: list[Any]
+) -> list[Any]:
+    """Drop files the candidate creates at a path the hidden ``test.patch`` also creates.
+
+    The prompt forbids editing existing tests, not creating a new one at the conventional path,
+    and that is exactly the file ``test.patch`` brings. Removing the candidate copy before the
+    line cap, the diff-guard and SAST makes the hidden patch apply cleanly over the tree; the
+    hidden tests still decide the verdict. A canary keeps the strict behaviour.
+    """
+    if state.canary:
+        return changes
+    created = testpatch.created_paths(task.test_patch)
+    superseded = sorted(
+        change.path for change in changes if change.status == "A" and change.path in created
+    )
+    if not superseded:
+        return changes
+    for path in superseded:
+        parts = PurePosixPath(path).parts
+        if not parts or ".." in parts or path.startswith("/"):
+            raise InfraError("unsafe path in the candidate diff")
+        candidate.joinpath(*parts).unlink()
+    gitops.stage_everything(candidate, state.home)
+    state.informative["superseded_by_hidden"] = superseded
+    dropped = set(superseded)
+    return [change for change in changes if change.path not in dropped]
 
 
 # ---------------------------------------------------------------------------- canary

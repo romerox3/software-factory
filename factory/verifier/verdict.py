@@ -12,7 +12,7 @@ from typing import Any
 
 import jsonschema
 
-VERIFIER_VERSION = "0.1.0"
+VERIFIER_VERSION = "0.2.0"
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "verdict.schema.json"
 HIDDEN_CHECKS_MESSAGE = "fallan comprobaciones ocultas"
 
