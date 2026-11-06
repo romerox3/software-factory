@@ -130,7 +130,7 @@ def _diff_text(root: Path, run: Mapping[str, Any], run_id: str) -> str | None:
     if not path.is_absolute():
         path = root / path
     try:
-        return path.read_text(encoding="utf-8")
+        return path.read_bytes().decode("utf-8", "surrogateescape")
     except OSError:
         return None
 

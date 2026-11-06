@@ -220,7 +220,12 @@ def _format_delta(value: float | None) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Report F0 metrics.")
     parser.add_argument("--runs", type=Path, help="directory with runs/ and verdicts/")
-    parser.add_argument("--gold", type=Path, help="JSON object mapping task_id to gold diff")
+    parser.add_argument(
+        "--gold",
+        type=Path,
+        help="JSON object mapping task_id to the exact gold diff text decoded with "
+        "surrogateescape; line endings (CRLF) must match the base tree",
+    )
     parser.add_argument("--out", help="output prefix; writes <prefix>.md and <prefix>.json")
     parser.add_argument(
         "--sources", type=Path, help="directory with <task_id>/snapshot base source trees"

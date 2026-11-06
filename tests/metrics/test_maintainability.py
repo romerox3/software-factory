@@ -1,9 +1,11 @@
 """M7a and M7b must follow lizard on small hand-written trees and diffs."""
 
+import json
 from pathlib import Path
 
 import pytest
 
+from factory.metrics.load import load_dataset
 from factory.metrics.maintainability import measure, parse_diff
 
 BASE = """def check(x):
@@ -29,6 +31,35 @@ def _write(root: Path, path: str, text: str) -> None:
     full = root / path
     full.parent.mkdir(parents=True, exist_ok=True)
     full.write_text(text, encoding="utf-8")
+
+
+def _write_bytes(root: Path, path: str, data: bytes) -> None:
+    full = root / path
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_bytes(data)
+
+
+def _write_dataset(root: Path, diff: bytes) -> None:
+    (root / "runs").mkdir(parents=True)
+    (root / "verdicts").mkdir()
+    (root / "diffs").mkdir()
+    (root / "diffs" / "r1.patch").write_bytes(diff)
+    run = {
+        "run_id": "r1",
+        "diff": {"uri": "diffs/r1.patch"},
+        "cost": {"usd_real": 0.1, "usd_shadow": 0.0},
+    }
+    verdict = {
+        "run_id": "r1",
+        "task_id": "t1",
+        "arm": "A1",
+        "attempt": 1,
+        "repetition": 1,
+        "verdict": "accept",
+        "verify_cost_usd": 0.01,
+    }
+    (root / "runs" / "r1.json").write_text(json.dumps(run), encoding="utf-8")
+    (root / "verdicts" / "r1.json").write_text(json.dumps(verdict), encoding="utf-8")
 
 
 def test_parse_diff_maps_lines_to_both_sides() -> None:
@@ -184,3 +215,18 @@ def test_diff_that_does_not_apply_raises(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="does not apply"):
         measure(tmp_path, diff)
+
+
+def test_crlf_diff_from_dataset_applies_and_measures(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    _write_dataset(dataset_dir, ADD_IF.replace("\n", "\r\n").encode("utf-8"))
+    base = tmp_path / "src"
+    _write_bytes(base, "app.py", BASE.replace("\n", "\r\n").encode("utf-8"))
+
+    record = load_dataset(dataset_dir).records[0]
+
+    assert record.diff_text is not None
+    delta = measure(base, record.diff_text)
+    assert delta.ccn_max == 1
+    assert delta.ccn_mean == pytest.approx(1.0)
+    assert delta.nloc == 2
