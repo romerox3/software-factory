@@ -27,6 +27,9 @@ from lizard_core.analysis import analyze_files
 from factory.miner.split import is_test_path
 from factory.verifier.gitops import apply_patch, copy_tree
 
+# lizard's duplicate extension CLI default, used by ``get_duplicates()``
+MIN_DUPLICATE_TOKENS = 70
+
 _HUNK = re.compile(
     r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
     r"\+(?P<new_start>\d+)(?:,(?P<new_count>\d+))? @@"
@@ -205,7 +208,7 @@ def _duplicate_blocks(root: Path, infos: Mapping[str, Any]) -> int:
     extensions = get_extensions(["duplicate"])
     list(analyze_files(files, 1, extensions))
     finder = next(extension for extension in extensions if hasattr(extension, "get_duplicates"))
-    return sum(1 for _ in finder.get_duplicates(min_duplicate_tokens=0))
+    return sum(1 for _ in finder.get_duplicates(min_duplicate_tokens=MIN_DUPLICATE_TOKENS))
 
 
 def _header_path(raw: str) -> str | None:

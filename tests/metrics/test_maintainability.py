@@ -102,26 +102,68 @@ def test_copied_block_adds_one_duplicate(tmp_path: Path) -> None:
         "    zeta = epsilon * beta\n"
         "    eta = zeta - gamma\n"
         "    theta = eta + delta\n"
+        "    iota = theta * theta\n"
+        "    kappa = iota + epsilon\n"
+        "    lam = kappa - beta\n"
+        "    mu = lam / 5\n"
+        "    nu = mu + gamma\n"
+        "    xi = nu * delta\n"
+        "    omicron = xi - theta\n"
+        "    pi = omicron + iota\n"
+        "    rho = pi * kappa\n"
+        "    sigma = rho - lam\n"
     )
-    _write(tmp_path, "app.py", "def original(x):\n" + block + "    return theta\n")
+    body = block.splitlines()
+    tail = "    return sigma\n"
+    _write(tmp_path, "app.py", "def original(x):\n" + block + tail)
+    old_count = len(body) + 2
+    added = ["", "", "def copy(x):", *body, "    return sigma"]
     diff = (
-        "diff --git a/app.py b/app.py\n"
-        "--- a/app.py\n"
-        "+++ b/app.py\n"
-        "@@ -1,10 +1,22 @@\n"
-        " def original(x):\n"
-        + "".join(f" {line}\n" for line in block.splitlines())
-        + "     return theta\n"
-        "+\n"
-        "+\n"
-        "+def copy(x):\n"
-        + "".join(f"+{line}\n" for line in block.splitlines())
-        + "+    return theta\n"
+        "\n".join(
+            [
+                "diff --git a/app.py b/app.py",
+                "--- a/app.py",
+                "+++ b/app.py",
+                f"@@ -1,{old_count} +1,{old_count + len(added)} @@",
+                " def original(x):",
+                *(f" {line}" for line in body),
+                "     return sigma",
+                *(f"+{line}" for line in added),
+            ]
+        )
+        + "\n"
     )
 
     delta = measure(tmp_path, diff)
 
     assert delta.new_dup_blocks >= 1
+
+
+def test_short_repeated_snippet_is_not_a_duplicate(tmp_path: Path) -> None:
+    block = (
+        "    alpha, beta = beta, alpha\n"
+        "    gamma = alpha + beta + alpha * beta - 100\n"
+        "    return gamma if gamma else alpha\n"
+    )
+    body = ["    first = 1", *block.splitlines(), "    return first"]
+    _write(tmp_path, "app.py", "def one(x):\n" + "".join(f"{line}\n" for line in body))
+    added = ["", "def two(x):", *body]
+    diff = (
+        "\n".join(
+            [
+                "diff --git a/app.py b/app.py",
+                "--- a/app.py",
+                "+++ b/app.py",
+                f"@@ -1,{len(body) + 1} +1,{len(body) + 1 + len(added)} @@",
+                " def one(x):",
+                *(f" {line}" for line in body),
+                *(f"+{line}" for line in added),
+            ]
+        )
+        + "\n"
+    )
+
+    assert measure(tmp_path, diff).new_dup_blocks == 0
 
 
 def test_diff_without_duplication_has_no_new_blocks(tmp_path: Path) -> None:
