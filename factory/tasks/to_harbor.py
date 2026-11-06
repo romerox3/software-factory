@@ -202,6 +202,7 @@ def _build_dockerfile(
         lines.append(f"RUN cd {shlex.quote(workdir)} && git checkout -qf {commit} && rm -rf .git")
     if has_snapshot:
         lines.append(f"COPY {SNAPSHOT_GIT_NAME} {workdir}/.git")
+        lines.append(f"RUN cd {shlex.quote(workdir)} && git checkout -qf HEAD -- .")
     if task["visible_tests"]["command"].startswith(REBENCH_ENV_PREFIX):
         lines.append(f"ENV PATH={REBENCH_ENV_BIN}:$PATH")
     if executor is not None:

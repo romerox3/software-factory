@@ -610,7 +610,6 @@ def _write_canary(
 
     document = dict(task_document)
     document["task_id"] = canary_id
-    document["repo"] = {**task_document["repo"], "commit": head}
     document["visible_tests"] = {
         "command": visible_command,
         "ids": list(visible_ids),

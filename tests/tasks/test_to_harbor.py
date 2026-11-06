@@ -92,6 +92,7 @@ def test_task_toml_and_dockerfile(tmp_path: Path) -> None:
     dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
     assert dockerfile.splitlines()[0] == f"FROM {TASK['image']}"
     assert not any(line.startswith("ENV PATH=") for line in dockerfile.splitlines())
+    assert not any(line.startswith("RUN ") for line in dockerfile.splitlines())
 
     test_script = generated / "tests" / "test.sh"
     contents = test_script.read_text(encoding="utf-8")
@@ -234,7 +235,7 @@ def add_snapshot(task_dir: Path) -> Path:
     return snapshot_git
 
 
-def test_default_workdir_copies_the_snapshot_and_needs_no_checkout(tmp_path: Path) -> None:
+def test_default_workdir_copies_the_snapshot_and_syncs_the_worktree(tmp_path: Path) -> None:
     task_dir = copy_visible_task(tmp_path)
     add_snapshot(task_dir)
 
@@ -242,7 +243,11 @@ def test_default_workdir_copies_the_snapshot_and_needs_no_checkout(tmp_path: Pat
 
     dockerfile = (generated / "environment" / "Dockerfile").read_text(encoding="utf-8")
     assert dockerfile == (
-        f"FROM {TASK['image']}\n\nCOPY snapshot.git /workspace/.git\nWORKDIR /workspace\n"
+        f"FROM {TASK['image']}\n"
+        "\n"
+        "COPY snapshot.git /workspace/.git\n"
+        "RUN cd /workspace && git checkout -qf HEAD -- .\n"
+        "WORKDIR /workspace\n"
     )
     assert (generated / "environment" / "snapshot.git" / "HEAD").is_file()
 
@@ -261,6 +266,7 @@ def test_real_workdir_checks_out_the_base_and_replaces_the_history(tmp_path: Pat
         "\n"
         f"RUN cd /testbed && git checkout -qf {commit} && rm -rf .git\n"
         "COPY snapshot.git /testbed/.git\n"
+        "RUN cd /testbed && git checkout -qf HEAD -- .\n"
         "WORKDIR /testbed\n"
     )
     assert (generated / "environment" / "snapshot.git" / "HEAD").is_file()

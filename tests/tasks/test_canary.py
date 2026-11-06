@@ -21,6 +21,7 @@ from factory.tasks.canary import (
     mutate_source,
     narrow_command,
 )
+from factory.tasks.to_harbor import snapshot_head
 from factory.tasks.workdir import DEFAULT_WORKDIR
 from factory.verifier import DockerSandbox, verify
 from tests.verifier.support import ensure_image
@@ -195,6 +196,7 @@ def test_builds_a_canary_and_restores_the_test(tmp_path: Path) -> None:
     source_visible = read_json(store / "visible" / TASK_ID / "factory.task.json")
     assert "--junitxml=" not in source_visible["visible_tests"]["command"]
     document = read_json(visible / "factory.task.json")
+    assert document["repo"] == source_visible["repo"]
     assert document["visible_tests"]["command"] == narrow_command(
         hidden_command, str(result.test_id)
     )
@@ -541,7 +543,7 @@ def test_the_verifier_judges_the_built_canary(tmp_path: Path, docker_image: str)
     canary_id = str(result.canary_id)
     visible = out / "visible" / canary_id
     mirror = visible / "snapshot"
-    commit = read_json(visible / "factory.task.json")["repo"]["commit"]
+    commit = snapshot_head(visible)
     sandbox = DockerSandbox(image=docker_image)
 
     def judge(diff: bytes, run: dict[str, Any]):
