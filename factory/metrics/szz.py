@@ -5,10 +5,14 @@ attributes the bug to the commits that last touched the lines the fix deletes or
 modifies, using ``git blame`` on the fix's parent (PyDriller's
 ``get_commits_last_modified_lines``).
 
-Test files are filtered with the shared path heuristic of docs/06 §2.2 step 3
-(``factory.miner.split``), and blank or comment-only lines are ignored by
-PyDriller. A change is censored while ``window_days`` have not elapsed since its
-commit, so it is left out of the denominator until the window is observable.
+Attribution only looks at source files. Blaming docs, changelogs and CI config
+produces false positives: a fix that edits a changelog line would blame the
+previous feature commit, and a docs or CI change would be counted as a
+regression. Test files are filtered with the shared path heuristic of docs/06
+§2.2 step 3 (``factory.miner.split``), and blank or comment-only lines are
+ignored by PyDriller. A change is censored while ``window_days`` have not
+elapsed since its commit, so it is left out of the denominator until the window
+is observable.
 """
 
 from __future__ import annotations
@@ -16,13 +20,67 @@ from __future__ import annotations
 import re
 import subprocess
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from pydriller import Commit, Git
 
 from factory.miner.split import is_test_path
 
 DEFAULT_FIX_REGEX = r"(?i)\b(fix|fixes|fixed|bug|regression|revert)\b"
+
+_SOURCE_SUFFIXES = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".mjs",
+        ".cjs",
+        ".go",
+        ".rs",
+        ".java",
+        ".kt",
+        ".kts",
+        ".scala",
+        ".rb",
+        ".php",
+        ".cs",
+        ".c",
+        ".h",
+        ".cc",
+        ".cpp",
+        ".hpp",
+        ".swift",
+        ".m",
+        ".mm",
+        ".sql",
+        ".sh",
+    }
+)
+_NON_SOURCE_TOP_DIRS = frozenset(
+    {
+        "docs",
+        "doc",
+        ".github",
+        ".gitlab",
+        ".circleci",
+        "ci",
+        "examples",
+        "benchmarks",
+    }
+)
+
+
+def is_source_path(path: str) -> bool:
+    """Whether ``path`` is a source file eligible for SZZ attribution."""
+    parts = PurePosixPath(path).parts
+    if not parts or is_test_path(path):
+        return False
+    if parts[0].lower() in _NON_SOURCE_TOP_DIRS:
+        return False
+    return PurePosixPath(path).suffix.lower() in _SOURCE_SUFFIXES
 
 
 def find_fix_commits(
@@ -31,7 +89,11 @@ def find_fix_commits(
     until: datetime,
     fix_regex: str = DEFAULT_FIX_REGEX,
 ) -> list[str]:
-    """Return the main-branch commits in ``[since, until]`` matching ``fix_regex``."""
+    """Return the main-branch commits in ``[since, until]`` matching ``fix_regex``.
+
+    Only the message is matched here; the source-file filter is applied at
+    attribution, so a fix that touches no source file yields no attribution.
+    """
     repo = Path(repo)
     pattern = re.compile(fix_regex)
     since = _as_utc(since)
@@ -104,8 +166,10 @@ def regressions_per_100(
 def _bug_introducing(git: Git, commit: Commit) -> set[str]:
     introduced: set[str] = set()
     for modification in commit.modified_files:
-        path = modification.old_path or modification.new_path
-        if path is None or is_test_path(path):
+        paths = [
+            path for path in (modification.old_path, modification.new_path) if path is not None
+        ]
+        if not paths or not all(is_source_path(path) for path in paths):
             continue
         blamed = git.get_commits_last_modified_lines(commit, modification=modification)
         for shas in blamed.values():

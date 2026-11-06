@@ -7,7 +7,12 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from factory.metrics.szz import bug_introducing, find_fix_commits, regressions_per_100
+from factory.metrics.szz import (
+    bug_introducing,
+    find_fix_commits,
+    is_source_path,
+    regressions_per_100,
+)
 
 GIT_ENV = {
     **os.environ,
@@ -21,6 +26,7 @@ GIT_ENV = {
 A_DATE = "2024-10-01T00:00:00Z"
 B_DATE = "2025-01-02T00:00:00Z"
 C_DATE = "2025-01-04T00:00:00Z"
+D_DATE = "2025-01-06T00:00:00Z"
 
 
 def run_git(repo: Path, *args: str, date: str | None = None) -> str:
@@ -111,6 +117,50 @@ def test_blank_and_comment_lines_are_not_attributed(tmp_path: Path) -> None:
     fix = commit_all(repo, "fix: drop the comment", B_DATE)
 
     assert bug_introducing(repo, fix) == set()
+
+
+def test_is_source_path() -> None:
+    cases = {
+        "src/a.py": True,
+        "README.md": False,
+        "CHANGELOG.rst": False,
+        "docs/conf.py": False,
+        ".github/workflows/ci.yml": False,
+        "tests/test_a.py": False,
+        "pkg/util.ts": True,
+        "Makefile": False,
+    }
+
+    assert {path: is_source_path(path) for path in cases} == cases
+
+
+def test_changelog_only_fix_attributes_nothing(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    write(repo, "src/m.py", "def add(a, b):\n    return a + b\n")
+    write(repo, "CHANGELOG.md", "# Changelog\n\n## 0.1.0\n")
+    commit_all(repo, "feat: add m", A_DATE)
+    write(repo, "CHANGELOG.md", "# Changelog\n\n## 0.1.0\n\n- Add add().\n")
+    commit_all(repo, "feat: document add", B_DATE)
+    write(repo, "CHANGELOG.md", "# Changelog\n\n## 0.1.0\n\n- Add add(a, b).\n")
+    fix = commit_all(repo, "fix: Update Changelog with credits to latest fix", C_DATE)
+
+    assert bug_introducing(repo, fix) == set()
+
+
+def test_fix_touching_source_and_docs_attributes_only_source(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    write(repo, "src/m.py", "def add(a, b):\n    return a + b\n")
+    write(repo, "docs/conf.py", "PROJECT = 'm'\n")
+    commit_all(repo, "feat: add m and its docs config", A_DATE)
+    write(repo, "src/m.py", "def add(a, b):\n    return a - b\n")
+    source_change = commit_all(repo, "feat: change m", B_DATE)
+    write(repo, "docs/conf.py", "PROJECT = 'm-renamed'\n")
+    commit_all(repo, "docs: rename the project", C_DATE)
+    write(repo, "src/m.py", "def add(a, b):\n    return a + b\n")
+    write(repo, "docs/conf.py", "PROJECT = 'm'\n")
+    fix = commit_all(repo, "fix: restore add and the project name", D_DATE)
+
+    assert bug_introducing(repo, fix) == {source_change}
 
 
 def test_regressions_per_100_and_censoring(tmp_path: Path) -> None:
