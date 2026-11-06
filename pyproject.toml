@@ -7,6 +7,7 @@ dependencies = [
     "httpx>=0.28.1",
     "huggingface-hub>=2.4.0",
     "jsonschema>=4.26.0",
+    "lizard==1.25.0",
     "pyarrow>=26.0.0",
     "pydriller>=2.12",
     "starlette>=1.10.0",

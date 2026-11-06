@@ -24,7 +24,7 @@ def test_metrics_match_hand_calculation() -> None:
     #   M1.gen costs = 3*0.10 + (0.20+0.30+0.40) + 3*0.05 = 1.35 over 5 accepts
     #     = 0.27
     #   M1.total = (1.35 + 9*0.01) / 5 = 1.44 / 5 = 0.288
-    #   M7a ratios among accepts: 10/10, 10/10, 10/10, 4/8, 16/8
+    #   M7c ratios among accepts: 10/10, 10/10, 10/10, 4/8, 16/8
     #     -> sorted 0.5, 1, 1, 1, 2 -> median 1
     # A2 accepts: t1 = 1/3, t2 = 0/3, t3 = 0/3.
     #   pass@1 = (1/3) / 3 = 1/9
@@ -32,7 +32,7 @@ def test_metrics_match_hand_calculation() -> None:
     #   M1.gen costs = (0.20+0.30+0.40) + 3*0.10 + 3*0.10 = 1.50 over 1 accept
     #     = 1.50
     #   M1.total = (1.50 + 9*0.02) / 1 = 1.68
-    #   M7a = 12/10 = 1.2
+    #   M7c = 12/10 = 1.2
     metrics = compute(load_dataset(DATA / "basic"), gold=_gold())
 
     a1 = metrics["A1"]
@@ -40,18 +40,20 @@ def test_metrics_match_hand_calculation() -> None:
     assert a1.pass_pow_k == pytest.approx(1 / 3)
     assert a1.m1_gen == pytest.approx(0.27)
     assert a1.m1_total == pytest.approx(0.288)
-    assert a1.m7a == pytest.approx(1.0)
+    assert a1.m7a is None
+    assert a1.m7b is None
+    assert a1.m7c == pytest.approx(1.0)
     assert a1.tasks == 3
     assert a1.error_infra == 0
-    assert a1.m7b is None
-    assert a1.m7c is None
 
     a2 = metrics["A2"]
     assert a2.pass_at_1 == pytest.approx(1 / 9)
     assert a2.pass_pow_k == 0.0
     assert a2.m1_gen == pytest.approx(1.50)
     assert a2.m1_total == pytest.approx(1.68)
-    assert a2.m7a == pytest.approx(1.2)
+    assert a2.m7a is None
+    assert a2.m7b is None
+    assert a2.m7c == pytest.approx(1.2)
     assert a2.tasks == 3
     assert a2.error_infra == 0
 

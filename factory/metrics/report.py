@@ -21,28 +21,38 @@ from factory.metrics.stats import paired_bootstrap
 
 BOOTSTRAP_N = 10000
 BOOTSTRAP_SEED = 0
-EXIT_CRITERIA = (
-    "valid_tasks",
-    "contract_valid_rate",
-    "error_infra_rate",
-    "verifier_reproducibility",
-    "false_accepts",
-    "reject_concordance",
-    "m4_baseline",
-)
+EXIT_CRITERIA: dict[str, tuple[str, ...]] = {
+    "A": (
+        "valid_tasks",
+        "contract_valid_rate",
+        "error_infra_rate",
+        "verifier_reproducibility",
+        "false_accepts",
+        "reject_concordance",
+        "best_arm_pass_at_1",
+    ),
+    # M4 needs the pilot repo, so it is a phase C criterion, not a phase A one.
+    "C": ("m4_baseline",),
+}
+DEFAULT_PHASE = "A"
 
 
 def build_report(
     runs_dir: Path,
     gold: Mapping[str, str],
     *,
+    sources: Mapping[str, Path] | None = None,
     k: int = DEFAULT_K,
     n: int = BOOTSTRAP_N,
     seed: int = BOOTSTRAP_SEED,
 ) -> dict[str, Any]:
-    """Compute the report payload for every arm and compare each with A1."""
+    """Compute the report payload for every arm and compare each with A1.
+
+    ``sources`` maps each task id to its base source tree; without it the M7a
+    and M7b values stay ``None``.
+    """
     dataset = load_dataset(runs_dir)
-    metrics = compute(dataset, k=k, gold=gold)
+    metrics = compute(dataset, k=k, gold=gold, sources=sources)
 
     arms = {
         arm: {
@@ -82,10 +92,13 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     lines = [
         "# F0 metrics",
         "",
-        f"First {k} repetitions per task. Costs are USD, M7a is candidate/gold size.",
+        (
+            f"First {k} repetitions per task. Costs are USD; M7a is the complexity delta vs gold, "
+            "M7b the new duplicate blocks vs gold, M7c the candidate/gold size."
+        ),
         "",
-        f"| Arm | pass@1 | pass^{k} | M1.gen | M1.total | M7a | Tasks | error_infra |",
-        "|---|---|---|---|---|---|---|---|",
+        f"| Arm | pass@1 | pass^{k} | M1.gen | M1.total | M7a | M7b | M7c | Tasks | error_infra |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for arm, value in report["arms"].items():
         lines.append(
@@ -97,7 +110,9 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     _format_rate(value["pass_pow_k"]),
                     _format_usd(value["m1_gen"]),
                     _format_usd(value["m1_total"]),
-                    _format_ratio(value["m7a"]),
+                    _format_delta(value["m7a"]),
+                    _format_delta(value["m7b"]),
+                    _format_ratio(value["m7c"]),
                     str(value["tasks"]),
                     str(value["error_infra"]),
                 )
@@ -143,11 +158,11 @@ def write_report(prefix: str | Path, report: Mapping[str, Any]) -> tuple[Path, P
     return markdown_path, json_path
 
 
-def missing_criteria(text: str) -> list[str]:
-    """Return the F0 exit criteria without a valued line in ``text``."""
+def missing_criteria(text: str, phase: str = DEFAULT_PHASE) -> list[str]:
+    """Return the exit criteria of ``phase`` without a valued line in ``text``."""
     return [
         key
-        for key in EXIT_CRITERIA
+        for key in EXIT_CRITERIA[phase]
         if not any(_line_has_value(line, key) for line in text.splitlines())
     ]
 
@@ -175,6 +190,17 @@ def _load_gold(path: Path) -> dict[str, str]:
     return gold
 
 
+def _load_sources(path: Path) -> dict[str, Path]:
+    if not path.is_dir():
+        raise ValueError(f"{path}: not a directory")
+    sources: dict[str, Path] = {}
+    for task_dir in sorted(path.iterdir()):
+        snapshot = task_dir / "snapshot"
+        if task_dir.is_dir() and snapshot.is_dir():
+            sources[task_dir.name] = snapshot
+    return sources
+
+
 def _format_rate(value: float | None) -> str:
     return f"{value:.2%}" if value is not None else "n/a"
 
@@ -196,7 +222,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runs", type=Path, help="directory with runs/ and verdicts/")
     parser.add_argument("--gold", type=Path, help="JSON object mapping task_id to gold diff")
     parser.add_argument("--out", help="output prefix; writes <prefix>.md and <prefix>.json")
+    parser.add_argument(
+        "--sources", type=Path, help="directory with <task_id>/snapshot base source trees"
+    )
     parser.add_argument("--check", type=Path, help="Markdown report to check")
+    parser.add_argument(
+        "--phase", default=DEFAULT_PHASE, choices=sorted(EXIT_CRITERIA), help="phase to check"
+    )
     args = parser.parse_args(argv)
 
     if args.out is None and args.check is None:
@@ -207,7 +239,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error("--out requires --runs and --gold")
         try:
             gold = _load_gold(args.gold)
-            report = build_report(args.runs, gold)
+            sources = _load_sources(args.sources) if args.sources is not None else None
+            report = build_report(args.runs, gold, sources=sources)
             markdown_path, json_path = write_report(args.out, report)
         except (OSError, ValueError, TypeError) as exc:
             print(f"report: {exc}", file=sys.stderr)
@@ -220,7 +253,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as exc:
             print(f"report: {exc}", file=sys.stderr)
             return 1
-        missing = missing_criteria(text)
+        missing = missing_criteria(text, args.phase)
         if missing:
             print(
                 "missing exit criteria: " + ", ".join(missing),

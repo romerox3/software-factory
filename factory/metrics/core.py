@@ -1,4 +1,4 @@
-"""Per-arm F0 metrics: M1 (generation and total), M2 (pass@1, pass^k) and M7a.
+"""Per-arm F0 metrics: M1 (generation and total), M2 (pass@1, pass^k) and M7.
 
 The k first repetitions of each task are selected per arm. When a repetition
 was retried, only the earliest matching attempt counts, and ``error_infra``
@@ -11,8 +11,10 @@ import statistics
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from factory.metrics.load import Dataset, RunRecord
+from factory.metrics.maintainability import MaintainabilityDelta, measure
 
 DEFAULT_K = 3
 BASELINE_ARM = "A1"
@@ -27,8 +29,6 @@ class ArmMetrics:
     m1_gen: float | None
     m1_total: float | None
     m7a: float | None
-    # TODO(F0-18): M7b (new duplicated blocks) needs jscpd and M7c (size vs
-    # gold) needs lizard, so both stay None until those tools are wired in.
     m7b: float | None
     m7c: float | None
     tasks: int
@@ -73,6 +73,7 @@ def metrics_for_arm(
     *,
     k: int = DEFAULT_K,
     gold: Mapping[str, str] | None = None,
+    sources: Mapping[str, Path] | None = None,
     error_infra: int = 0,
 ) -> ArmMetrics:
     """Compute an arm's metrics from its non-``error_infra`` records."""
@@ -107,9 +108,9 @@ def metrics_for_arm(
         pass_pow_k=pass_pow_k,
         m1_gen=m1_gen,
         m1_total=m1_total,
-        m7a=_m7a(selected, gold),
-        m7b=None,
-        m7c=None,
+        m7a=_m7_delta(selected, gold, sources, "ccn_max"),
+        m7b=_m7_delta(selected, gold, sources, "new_dup_blocks"),
+        m7c=_m7c(selected, gold),
         tasks=len(by_task),
         error_infra=error_infra,
         per_task=per_task,
@@ -121,6 +122,7 @@ def compute(
     *,
     k: int = DEFAULT_K,
     gold: Mapping[str, str] | None = None,
+    sources: Mapping[str, Path] | None = None,
 ) -> dict[str, ArmMetrics]:
     """Compute every arm present in the dataset, with A1 first."""
     by_arm: dict[str, list[RunRecord]] = defaultdict(list)
@@ -133,13 +135,44 @@ def compute(
             by_arm[arm],
             k=k,
             gold=gold,
+            sources=sources,
             error_infra=dataset.error_infra_count(arm),
         )
         for arm in arms
     }
 
 
-def _m7a(selected: Sequence[RunRecord], gold: Mapping[str, str] | None) -> float | None:
+def _m7_delta(
+    selected: Sequence[RunRecord],
+    gold: Mapping[str, str] | None,
+    sources: Mapping[str, Path] | None,
+    attribute: str,
+) -> float | None:
+    """Median over tasks of the per-task median of candidate minus gold."""
+    if sources is None or gold is None:
+        return None
+    by_task: dict[str, list[float]] = defaultdict(list)
+    references: dict[str, MaintainabilityDelta] = {}
+    for record in selected:
+        if not record.accepted:
+            continue
+        if record.task_id not in gold:
+            raise ValueError(f"gold diff missing for task {record.task_id}")
+        if record.diff_text is None:
+            raise ValueError(f"diff missing for accepted run {record.run_id}")
+        if record.task_id not in sources:
+            raise ValueError(f"source tree missing for task {record.task_id}")
+        if record.task_id not in references:
+            references[record.task_id] = measure(sources[record.task_id], gold[record.task_id])
+        candidate = measure(sources[record.task_id], record.diff_text)
+        by_task[record.task_id].append(
+            getattr(candidate, attribute) - getattr(references[record.task_id], attribute)
+        )
+    medians = [statistics.median(values) for values in by_task.values()]
+    return statistics.median(medians) if medians else None
+
+
+def _m7c(selected: Sequence[RunRecord], gold: Mapping[str, str] | None) -> float | None:
     if gold is None:
         return None
     ratios: list[float] = []
