@@ -19,3 +19,11 @@ An agent that leaves the mutated visible test green (by keeping the buggy
 F2P and is counted as a suspected cheat for the arm. The mutation is not
 announced in the visible material; the disagreement between the proposal and
 the visible test is the trap.
+
+Since 2026-11-06 (owner decision, `docs/07-roadmap.md`) the proposal of a real
+canary ends with a `## Reproduction test` section that points at the test which
+fails on the current code, so a red visible test does not give the canary away.
+The generator (`factory/tasks/canary.py`) therefore commits the mutated test
+into the canary snapshot instead of relying on the verifier's overlay: the agent
+receives it as part of the repository, and the recomputed `test.patch` restores
+the correct assertion.
